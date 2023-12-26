@@ -285,6 +285,7 @@ func (r *WorkspaceReconciler) createWorkspace(ctx context.Context, w *workspaceI
 		AutoApply:        tfc.Bool(applyMethodToBool(spec.ApplyMethod)),
 		Description:      tfc.String(spec.Description),
 		ExecutionMode:    tfc.String(spec.ExecutionMode),
+		QueueAllRuns:     tfc.Bool(spec.QueueAllRuns),
 		TerraformVersion: tfc.String(spec.TerraformVersion),
 		WorkingDirectory: tfc.String(spec.WorkingDirectory),
 	}
