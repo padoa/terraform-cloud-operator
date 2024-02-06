@@ -285,7 +285,6 @@ func (r *WorkspaceReconciler) createWorkspace(ctx context.Context, w *workspaceI
 		AutoApply:        tfc.Bool(applyMethodToBool(spec.ApplyMethod)),
 		Description:      tfc.String(spec.Description),
 		ExecutionMode:    tfc.String(spec.ExecutionMode),
-		QueueAllRuns:     tfc.Bool(spec.QueueAllRuns),
 		TerraformVersion: tfc.String(spec.TerraformVersion),
 		WorkingDirectory: tfc.String(spec.WorkingDirectory),
 	}
@@ -645,6 +644,13 @@ func (r *WorkspaceReconciler) reconcileWorkspace(ctx context.Context, w *workspa
 	}
 	w.log.Info("Reconcile Notifications", "msg", "successfully reconcilied notifications")
 	r.Recorder.Eventf(&w.instance, corev1.EventTypeNormal, "ReconcileNotifications", "Reconcilied notifications in workspace ID %s", w.instance.Status.WorkspaceID)
+
+	func() (*tfc.Workspace, error) {
+		updateOptions := tfc.WorkspaceUpdateOptions{
+			QueueAllRuns: tfc.Bool(w.instance.Spec.QueueAllRuns),
+		}
+		return w.tfClient.Client.Workspaces.UpdateByID(ctx, w.instance.Status.WorkspaceID, updateOptions)
+	}()
 
 	return r.updateStatus(ctx, w, workspace)
 }
