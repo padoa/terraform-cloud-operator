@@ -287,6 +287,7 @@ func (r *WorkspaceReconciler) createWorkspace(ctx context.Context, w *workspaceI
 		ExecutionMode:       tfc.String(spec.ExecutionMode),
 		FileTriggersEnabled: tfc.Bool(spec.FileTriggersEnabled),
 		TriggerPatterns:     spec.TriggerPatterns,
+		TriggerPrefixes:     spec.TriggerPrefixes,
 		TerraformVersion:    tfc.String(spec.TerraformVersion),
 		WorkingDirectory:    tfc.String(spec.WorkingDirectory),
 	}
@@ -376,6 +377,20 @@ func (r *WorkspaceReconciler) updateWorkspace(ctx context.Context, w *workspaceI
 
 	if workspace.ExecutionMode != spec.ExecutionMode {
 		updateOptions.ExecutionMode = tfc.String(spec.ExecutionMode)
+	}
+
+	if workspace.FileTriggersEnabled != spec.FileTriggersEnabled {
+		updateOptions.FileTriggersEnabled = tfc.Bool(spec.FileTriggersEnabled)
+	}
+
+	triggerPatternsDiff := triggerPatternsDifference(getWorkspaceTriggerPatterns(workspace), getTriggerPatterns(&w.instance))
+	if len(triggerPatternsDiff) != 0 {
+		updateOptions.TriggerPatterns = spec.TriggerPatterns
+	}
+
+	triggerPrefixesDiff := triggerPrefixesDifference(getWorkspaceTriggerPrefixes(workspace), getTriggerPrefixes(&w.instance))
+	if len(triggerPrefixesDiff) != 0 {
+		updateOptions.TriggerPrefixes = spec.TriggerPrefixes
 	}
 
 	if spec.RemoteStateSharing != nil {

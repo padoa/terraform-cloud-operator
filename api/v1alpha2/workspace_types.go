@@ -485,6 +485,11 @@ type WorkspaceSpec struct {
 	//+kubebuilder:validation:MinItems:=1
 	//+optional
 	TriggerPatterns []string `json:"triggerPatterns,omitempty"`
+	// The list of pattern prefixes that will queue runs in Terraform Cloud when files in your VCS repository change.
+	//
+	//+kubebuilder:validation:MinItems:=1
+	//+optional
+	TriggerPrefixes []string `json:"triggerPrefixes,omitempty"`
 	// The version of Terraform to use for this workspace.
 	// If not specified, the latest available version will be used.
 	// Must match pattern: `^\\d{1}\\.\\d{1,2}\\.\\d{1,2}$`
