@@ -309,7 +309,6 @@ func (r *WorkspaceReconciler) createWorkspace(ctx context.Context, w *workspaceI
 			Identifier:   tfc.String(spec.VersionControl.Repository),
 			Branch:       tfc.String(spec.VersionControl.Branch),
 		}
-		options.FileTriggersEnabled = tfc.Bool(false)
 	}
 
 	if spec.RemoteStateSharing != nil {
