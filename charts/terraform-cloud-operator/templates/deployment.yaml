@@ -93,11 +93,11 @@ spec:
             {{- toYaml .Values.kubeRbacProxy.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
-      {{- with .Values.operator.affinity }}
+      {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.operator.tolerations }}
+      {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
