@@ -73,6 +73,11 @@ spec:
                 description: Workspace description.
                 minLength: 1
                 type: string
+              destroyOnDeletion:
+                default: false
+                description: 'Specify whether or not to execute a Destroy run when
+                  the object is deleted from the Kubernetes. Default: `false`.'
+                type: boolean
               environmentVariables:
                 description: 'Terraform Environment variables for all plans and applies
                   in this workspace. Variables defined within a workspace always overwrite
@@ -624,6 +629,23 @@ spec:
           status:
             description: WorkspaceStatus defines the observed state of Workspace.
             properties:
+              deleteRunStatus:
+                description: Workspace Destroy Run status.
+                properties:
+                  configurationVersion:
+                    type: string
+                  id:
+                    description: Current(both active and finished) Terraform Cloud
+                      run ID.
+                    type: string
+                  outputRunID:
+                    description: Run ID of the latest run that could update the outputs.
+                    type: string
+                  status:
+                    description: Current(both active and finished) Terraform Cloud
+                      run status.
+                    type: string
+                type: object
               observedGeneration:
                 description: Real world state generation.
                 format: int64
