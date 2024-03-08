@@ -431,6 +431,12 @@ type WorkspaceSpec struct {
 	//+kubebuilder:default=true
 	//+optional
 	AllowDestroyPlan bool `json:"allowDestroyPlan"`
+	// Specify whether or not to execute a Destroy run when the object is deleted from the Kubernetes.
+	// Default: `false`.
+	//
+	//+kubebuilder:default:=false
+	//+optional
+	DestroyOnDeletion bool `json:"destroyOnDeletion"`
 	// Workspace description.
 	//
 	//+kubebuilder:validation:MinLength:=1
@@ -588,6 +594,10 @@ type WorkspaceStatus struct {
 	//
 	//+optional
 	Run RunStatus `json:"runStatus,omitempty"`
+	// Workspace Destroy Run status.
+	//
+	//+optional
+	DeleteRun RunStatus `json:"deleteRunStatus,omitempty"`
 	// Workspace Terraform version.
 	//
 	//+kubebuilder:validation:Pattern:="^\\d{1}\\.\\d{1,2}\\.\\d{1,2}$"

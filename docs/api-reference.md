@@ -661,6 +661,7 @@ _Appears in:_
 | `token` _[Token](#token)_ | API Token to be used for API calls. |
 | `applyMethod` _string_ | Define either change will be applied automatically(auto) or require an operator to confirm(manual). Must be one of the following values: `auto`, `manual`. Default: `manual`. More information: - https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings#auto-apply-and-manual-apply |
 | `allowDestroyPlan` _boolean_ | Allows a destroy plan to be created and applied. Default: `true`. More information: - https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings#destruction-and-deletion |
+| `destroyOnDeletion` _boolean_ | Specify whether or not to execute a Destroy run when the object is deleted from the Kubernetes. Default: `false`. |
 | `description` _string_ | Workspace description. |
 | `agentPool` _[WorkspaceAgentPool](#workspaceagentpool)_ | Terraform Cloud Agents allow Terraform Cloud to communicate with isolated, private, or on-premises infrastructure. More information: - https://developer.hashicorp.com/terraform/cloud-docs/agents |
 | `executionMode` _string_ | Define where the Terraform code will be executed. Must be one of the following values: `agent`, `local`, `remote`. Default: `remote`. More information: - https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings#execution-mode |
