@@ -585,6 +585,8 @@ func (r *WorkspaceReconciler) deleteWorkspace(ctx context.Context, w *workspaceI
 				return err
 			}
 			if len(list.Items) == 0 {
+				w.log.Info("Reconcile Workspace", "msg", "no resources in the workspace, no destroy run will be created")
+				r.Recorder.Eventf(&w.instance, corev1.EventTypeNormal, "ReconcileWorkspace", "no resources in the workspace, no destroy run will be created")
 				needDeleteRun = false
 			}
 		}
