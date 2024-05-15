@@ -457,32 +457,48 @@ func (r *WorkspaceReconciler) deleteWorkspace(ctx context.Context, w *workspaceI
 	}
 
 	if w.instance.Spec.DestroyOnDeletion {
+		needDeleteRun := true
+		// If we don't have a delete run yet, check if we need one to begin with. If there are no resources in the
+		// workspace we don't need the delete run.
 		if w.instance.Status.DeleteRun.ID == "" {
-			w.log.Info("Reconcile Workspace", "msg", "destroyOnDeletion is true, creating a new destroy run")
-			run, err := w.tfClient.Client.Runs.Create(ctx, tfc.RunCreateOptions{
-				IsDestroy: tfc.Bool(true),
-				Message:   tfc.String("Triggered by the Kubernetes Operator"),
-				Workspace: &tfc.Workspace{
-					ID: w.instance.Status.WorkspaceID,
-				},
-			})
+			list, err := w.tfClient.Client.WorkspaceResources.List(ctx, w.instance.Status.WorkspaceID, &tfc.WorkspaceResourceListOptions{})
 			if err != nil {
-				w.log.Error(err, "Reconcile Workspace", "msg", "failed to create a new destroy run")
-				r.Recorder.Event(&w.instance, corev1.EventTypeWarning, "ReconcileWorkspace", "Failed to create a new destroy run")
+				w.log.Error(err, "Reconcile Workspace", "msg", "failed to get list of resources in workspace")
+				r.Recorder.Event(&w.instance, corev1.EventTypeWarning, "ReconcileWorkspace", "Failed to get list of resources in workspace")
 				return err
 			}
-			w.log.Info("Reconcile Workspace", "msg", "successfully created a new destroy run")
-			r.Recorder.Eventf(&w.instance, corev1.EventTypeNormal, "ReconcileWorkspace", "Successfully created a new destroy run with ID %s", run.ID)
-			return r.updateStatusDestroy(ctx, w, run)
+			if len(list.Items) == 0 {
+				needDeleteRun = false
+			}
 		}
-		cr, err := w.tfClient.Client.Runs.Read(ctx, w.instance.Status.DeleteRun.ID)
-		if err != nil {
-			w.log.Error(err, "Reconcile Workspace", "msg", fmt.Sprintf("failed to read destroy run ID %s", w.instance.Status.DeleteRun.ID))
-			return err
-		}
-		if _, ok := runCompleteStatus[cr.Status]; !ok {
-			w.log.Info("Reconcile Workspace", "msg", "destroy run is still in progress")
-			return fmt.Errorf("destroy run is still in progress")
+		if needDeleteRun {
+			if w.instance.Status.DeleteRun.ID == "" {
+				w.log.Info("Reconcile Workspace", "msg", "destroyOnDeletion is true, creating a new destroy run")
+				run, err := w.tfClient.Client.Runs.Create(ctx, tfc.RunCreateOptions{
+					IsDestroy: tfc.Bool(true),
+					Message:   tfc.String("Triggered by the Kubernetes Operator"),
+					Workspace: &tfc.Workspace{
+						ID: w.instance.Status.WorkspaceID,
+					},
+				})
+				if err != nil {
+					w.log.Error(err, "Reconcile Workspace", "msg", "failed to create a new destroy run")
+					r.Recorder.Event(&w.instance, corev1.EventTypeWarning, "ReconcileWorkspace", "Failed to create a new destroy run")
+					return err
+				}
+				w.log.Info("Reconcile Workspace", "msg", "successfully created a new destroy run")
+				r.Recorder.Eventf(&w.instance, corev1.EventTypeNormal, "ReconcileWorkspace", "Successfully created a new destroy run with ID %s", run.ID)
+				return r.updateStatusDestroy(ctx, w, run)
+			}
+			cr, err := w.tfClient.Client.Runs.Read(ctx, w.instance.Status.DeleteRun.ID)
+			if err != nil {
+				w.log.Error(err, "Reconcile Workspace", "msg", fmt.Sprintf("failed to read destroy run ID %s", w.instance.Status.DeleteRun.ID))
+				return err
+			}
+			if _, ok := runCompleteStatus[cr.Status]; !ok {
+				w.log.Info("Reconcile Workspace", "msg", "destroy run is still in progress")
+				return fmt.Errorf("destroy run is still in progress")
+			}
 		}
 	}
 	err := w.tfClient.Client.Workspaces.DeleteByID(ctx, w.instance.Status.WorkspaceID)
