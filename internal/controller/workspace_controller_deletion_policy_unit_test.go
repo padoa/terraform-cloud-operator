@@ -61,15 +61,29 @@ type fakeTFC struct {
 	workspace  string
 	currentRun string
 	runs       map[string]*tfc.Run
+	order      []string // insertion order, oldest first
 	created    int
 }
 
 func newFakeTFC(workspace string, current *tfc.Run) *fakeTFC {
-	return &fakeTFC{
-		workspace:  workspace,
-		currentRun: current.ID,
-		runs:       map[string]*tfc.Run{current.ID: current},
+	f := &fakeTFC{
+		workspace: workspace,
+		runs:      map[string]*tfc.Run{},
 	}
+	f.addRun(current)
+	f.currentRun = current.ID
+	return f
+}
+
+// addRun appends a run without making it the workspace's current run, which is how a
+// destroy run queued behind a pending apply looks.
+func (f *fakeTFC) addRun(run *tfc.Run) {
+	f.runs[run.ID] = run
+	f.order = append(f.order, run.ID)
+}
+
+func (f *fakeTFC) setCurrentRun(id string) {
+	f.currentRun = id
 }
 
 func (f *fakeTFC) handler() http.Handler {
@@ -83,7 +97,21 @@ func (f *fakeTFC) handler() http.Handler {
 	mux.HandleFunc("/api/v2/workspaces/", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		if strings.TrimPrefix(r.URL.Path, "/api/v2/workspaces/") != f.workspace {
+		path := strings.TrimPrefix(r.URL.Path, "/api/v2/workspaces/")
+		// Runs.List, served newest first the way HCP Terraform does.
+		if id, ok := strings.CutSuffix(path, "/runs"); ok {
+			if id != f.workspace {
+				http.Error(w, `{"errors":[{"status":"404","title":"not found"}]}`, http.StatusNotFound)
+				return
+			}
+			items := make([]*tfc.Run, 0, len(f.order))
+			for i := len(f.order) - 1; i >= 0; i-- {
+				items = append(items, f.runs[f.order[i]])
+			}
+			writeJSONAPI(w, http.StatusOK, items)
+			return
+		}
+		if path != f.workspace {
 			http.Error(w, `{"errors":[{"status":"404","title":"not found"}]}`, http.StatusNotFound)
 			return
 		}
@@ -103,7 +131,7 @@ func (f *fakeTFC) handler() http.Handler {
 			Status:               tfc.RunPending,
 			ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-1"},
 		}
-		f.runs[run.ID] = run
+		f.addRun(run)
 		f.currentRun = run.ID
 		writeJSONAPI(w, http.StatusCreated, run)
 	})
@@ -228,8 +256,9 @@ func TestDeleteWorkspaceDestroyReusesQueuedRunAfterStatusUpdateFailure(t *testin
 // would delete the workspace, and its resources' state, once that apply completes.
 func TestDeleteWorkspaceDestroyDoesNotAdoptNonDestroyCurrentRun(t *testing.T) {
 	ctx := context.Background()
-	server := newFakeTFC("ws-test", &tfc.Run{ID: "run-apply-2", IsDestroy: false, Status: tfc.RunPending, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-2"}})
-	server.runs["run-destroy-failed"] = &tfc.Run{ID: "run-destroy-failed", IsDestroy: true, Status: tfc.RunErrored, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-1"}}
+	server := newFakeTFC("ws-test", &tfc.Run{ID: "run-destroy-failed", IsDestroy: true, Status: tfc.RunErrored, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-1"}})
+	server.addRun(&tfc.Run{ID: "run-apply-2", IsDestroy: false, Status: tfc.RunPending, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-2"}})
+	server.setCurrentRun("run-apply-2")
 	r, w, _ := newDeletionFixture(t, server, "run-destroy-failed", 0)
 
 	if err := r.deleteWorkspace(ctx, w); err != nil {
@@ -243,11 +272,33 @@ func TestDeleteWorkspaceDestroyDoesNotAdoptNonDestroyCurrentRun(t *testing.T) {
 	}
 }
 
+// HCP Terraform keeps current-run pointed at whichever run holds the workspace queue, so
+// a destroy run queued behind a pending apply is never the current run. Observed on
+// dev-gtw: one lost status write in this state used to queue a second destroy run.
+func TestDeleteWorkspaceDestroyAdoptsRunQueuedBehindCurrentRun(t *testing.T) {
+	ctx := context.Background()
+	server := newFakeTFC("ws-test", &tfc.Run{ID: "run-apply-pending", IsDestroy: false, Status: tfc.RunPending, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-1"}})
+	server.addRun(&tfc.Run{ID: "run-destroy-queued", IsDestroy: true, Status: tfc.RunPending, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-1"}})
+	server.setCurrentRun("run-apply-pending")
+	r, w, _ := newDeletionFixture(t, server, "", 0)
+
+	if err := r.deleteWorkspace(ctx, w); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	if w.instance.Status.DestroyRunID != "run-destroy-queued" {
+		t.Fatalf("destroyRunID = %q, want run-destroy-queued", w.instance.Status.DestroyRunID)
+	}
+	if server.created != 0 {
+		t.Fatalf("created %d destroy runs, want 0", server.created)
+	}
+}
+
 // A newer destroy run started outside the operator is tracked instead of duplicated.
 func TestDeleteWorkspaceDestroyAdoptsNewerDestroyRun(t *testing.T) {
 	ctx := context.Background()
-	server := newFakeTFC("ws-test", &tfc.Run{ID: "run-destroy-manual", IsDestroy: true, Status: tfc.RunPlanning, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-3"}})
-	server.runs["run-destroy-failed"] = &tfc.Run{ID: "run-destroy-failed", IsDestroy: true, Status: tfc.RunErrored, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-1"}}
+	server := newFakeTFC("ws-test", &tfc.Run{ID: "run-destroy-failed", IsDestroy: true, Status: tfc.RunErrored, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-1"}})
+	server.addRun(&tfc.Run{ID: "run-destroy-manual", IsDestroy: true, Status: tfc.RunPlanning, ConfigurationVersion: &tfc.ConfigurationVersion{ID: "cv-3"}})
+	server.setCurrentRun("run-destroy-manual")
 	r, w, _ := newDeletionFixture(t, server, "run-destroy-failed", 0)
 
 	if err := r.deleteWorkspace(ctx, w); err != nil {
