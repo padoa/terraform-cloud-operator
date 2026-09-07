@@ -1,0 +1,5 @@
+kind: NOTES
+body: 'Sync the fork with upstream v2.12.1. This brings in every agent autoscaling fix released since v2.9.0, in particular excluding runs that await user interaction from scaling (GH-618), accounting for speculative runs (GH-664), treating PolicyChecked as a user-interaction status (GH-703), not counting terminal plan-only runs as pending (GH-718), and no longer terminating an agent while its run is in the post-plan or post-apply stage (GH-610).'
+time: 2026-09-07T08:13:37.000000000Z
+custom:
+    PR: "7"
