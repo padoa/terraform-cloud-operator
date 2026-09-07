@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -16,7 +16,7 @@ func (w *workspaceInstance) getProjectIDByName(ctx context.Context) (string, err
 	listOpts := &tfc.ProjectListOptions{
 		Name: projectName,
 		ListOptions: tfc.ListOptions{
-			PageSize: maxPageSize,
+			PageSize: MaxPageSize,
 		},
 	}
 	for {

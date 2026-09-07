@@ -1,14 +1,12 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package v1alpha2
 
 import (
 	"testing"
-)
 
-const (
-	projectFinalizer = "project.app.terraform.io/finalizer"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsCreationCandidate(t *testing.T) {
@@ -31,9 +29,7 @@ func TestIsCreationCandidate(t *testing.T) {
 	for n, c := range cases {
 		t.Run(n, func(t *testing.T) {
 			out := c.project.IsCreationCandidate()
-			if out != c.expected {
-				t.Fatalf("Error matching output and expected: %#v vs %#v", out, c.expected)
-			}
+			assert.Equalf(t, c.expected, out, "Error matching output and expected: %#v vs %#v", out, c.expected)
 		})
 	}
 }

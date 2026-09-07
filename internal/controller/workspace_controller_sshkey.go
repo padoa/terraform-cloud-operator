@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -20,8 +20,8 @@ func (w *workspaceInstance) getSSHKeyID(ctx context.Context) (string, error) {
 		w.log.Info("Reconcile SSH Key", "msg", "getting SSH key ID by name")
 		listOpts := &tfc.SSHKeyListOptions{
 			ListOptions: tfc.ListOptions{
-				PageNumber: 1,
-				PageSize:   maxPageSize,
+				PageNumber: InitPageNumber,
+				PageSize:   MaxPageSize,
 			},
 		}
 		for {

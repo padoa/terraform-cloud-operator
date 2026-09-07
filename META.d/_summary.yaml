@@ -1,14 +1,14 @@
-# Copyright (c) HashiCorp, Inc.
+# Copyright IBM Corp. 2022, 2025
 # SPDX-License-Identifier: MPL-2.0
 
 ---
 
 schema: 1.1
 
-partition: tf-ecosystem
+partition: eic-integrations
 
 summary:
-  owner: team-tf-hybrid-cloud
+  owner: team-ipg-product-integrations
   description: |
     The HCP Terraform Operator for Kubernetes allows managing HCP Terraform / Terraform Enterprise resources via Kubernetes Custom Resources.
   

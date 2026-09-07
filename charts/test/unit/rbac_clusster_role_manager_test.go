@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package unit
@@ -48,6 +48,7 @@ func testRBACClusterRoleManagerRules(t *testing.T, rbac rbacv1.ClusterRole) {
 				"list",
 				"update",
 				"watch",
+				"patch",
 			},
 			APIGroups: []string{""},
 			Resources: []string{
@@ -76,8 +77,10 @@ func testRBACClusterRoleManagerRules(t *testing.T, rbac rbacv1.ClusterRole) {
 			APIGroups: []string{"app.terraform.io"},
 			Resources: []string{
 				"agentpools",
+				"agenttokens",
 				"modules",
 				"projects",
+				"runscollectors",
 				"workspaces",
 			},
 		},
@@ -88,8 +91,10 @@ func testRBACClusterRoleManagerRules(t *testing.T, rbac rbacv1.ClusterRole) {
 			APIGroups: []string{"app.terraform.io"},
 			Resources: []string{
 				"agentpools/finalizers",
+				"agenttokens/finalizers",
 				"modules/finalizers",
 				"projects/finalizers",
+				"runscollectors/finalizers",
 				"workspaces/finalizers",
 			},
 		},
@@ -102,8 +107,10 @@ func testRBACClusterRoleManagerRules(t *testing.T, rbac rbacv1.ClusterRole) {
 			APIGroups: []string{"app.terraform.io"},
 			Resources: []string{
 				"agentpools/status",
+				"agenttokens/status",
 				"modules/status",
 				"projects/status",
+				"runscollectors/status",
 				"workspaces/status",
 			},
 		},

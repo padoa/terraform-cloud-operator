@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -16,7 +16,7 @@ func (w *workspaceInstance) getOrgVariableSets(ctx context.Context) (map[string]
 	variableSets := make(map[string]*tfc.VariableSet)
 	listOpts := &tfc.VariableSetListOptions{
 		ListOptions: tfc.ListOptions{
-			PageSize: maxPageSize,
+			PageSize: MaxPageSize,
 		},
 	}
 
