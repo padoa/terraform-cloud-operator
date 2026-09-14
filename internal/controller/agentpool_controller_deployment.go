@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -10,29 +10,30 @@ import (
 	"net/url"
 
 	tfc "github.com/hashicorp/go-tfe"
-	appv1alpha2 "github.com/hashicorp/hcp-terraform-operator/api/v1alpha2"
-	"github.com/hashicorp/hcp-terraform-operator/internal/pointer"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	appv1alpha2 "github.com/hashicorp/hcp-terraform-operator/api/v1alpha2"
+	"github.com/hashicorp/hcp-terraform-operator/internal/pointer"
 )
 
 const (
 	poolNameLabel             = "agentpool.app.terraform.io/pool-name"
 	poolIDLabel               = "agentpool.app.terraform.io/pool-id"
-	defaultAgentImage         = "hashicorp/tfc-agent"
-	defaultAgentContainerName = "tfc-agent"
+	DefaultAgentImage         = "hashicorp/tfc-agent"
+	DefaultAgentContainerName = "tfc-agent"
 )
 
 func (r *AgentPoolReconciler) reconcileAgentDeployment(ctx context.Context, ap *agentPoolInstance) error {
 	ap.log.Info("Reconcile Agent Deployment", "msg", "new reconciliation event")
 	var d *appsv1.Deployment = &appsv1.Deployment{}
-	err := r.Client.Get(ctx, types.NamespacedName{Namespace: ap.instance.Namespace, Name: agentPoolDeploymentName(&ap.instance)}, d)
+	err := r.Client.Get(ctx, types.NamespacedName{Namespace: ap.instance.Namespace, Name: AgentPoolDeploymentName(&ap.instance)}, d)
 	if err == nil {
 		if ap.instance.Spec.AgentDeployment == nil {
 			// Delete the existing deployment
@@ -41,7 +42,7 @@ func (r *AgentPoolReconciler) reconcileAgentDeployment(ctx context.Context, ap *
 		// Update existing deployment
 		return r.updateDeployment(ctx, ap, d)
 	}
-	if errors.IsNotFound(err) {
+	if kerrors.IsNotFound(err) {
 		if ap.instance.Spec.AgentDeployment == nil { // Was a deployment configured?
 			ap.log.Info("Reconcile Agent Deployment", "msg",
 				fmt.Sprintf("skipping - no deployment configured in AgentPool %q", ap.instance.GetName()))
@@ -118,7 +119,7 @@ func (r *AgentPoolReconciler) deleteDeployment(ctx context.Context, ap *agentPoo
 		fmt.Sprintf("deleting agent deployment for AgentPool %q", ap.instance.GetName()))
 	derr := r.Client.Delete(ctx, d)
 	if derr != nil {
-		if errors.IsNotFound(derr) {
+		if kerrors.IsNotFound(derr) {
 			return nil
 		}
 		ap.log.Error(derr, "Reconcile Agent Deployment", "msg", fmt.Sprintf("failed to delete agent deployment '%s' for agent pool: %s", d.Name, agentPoolOutputObjectName(ap.instance.Name)))
@@ -146,8 +147,8 @@ func agentPoolDeployment(ap *agentPoolInstance) *appsv1.Deployment {
 	var s corev1.PodSpec = corev1.PodSpec{
 		Containers: []corev1.Container{ // default tfc-agent container if none configured by user
 			{
-				Name:  defaultAgentContainerName,
-				Image: defaultAgentImage,
+				Name:  DefaultAgentContainerName,
+				Image: DefaultAgentImage,
 			},
 		},
 	}
@@ -161,7 +162,7 @@ func agentPoolDeployment(ap *agentPoolInstance) *appsv1.Deployment {
 	}
 	d := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      agentPoolDeploymentName(&ap.instance),
+			Name:      AgentPoolDeploymentName(&ap.instance),
 			Namespace: ap.instance.Namespace,
 			Annotations: map[string]string{
 				poolNameLabel: ap.instance.Name,
@@ -195,8 +196,21 @@ func agentPoolDeployment(ap *agentPoolInstance) *appsv1.Deployment {
 }
 
 func decorateDeployment(ap *agentPoolInstance, d *appsv1.Deployment) {
-	envs := []corev1.EnvVar{
-		{
+	// Set TFE_ADDRESS on agent Pod if differnet than default TFC endpoint
+	bURL := ap.tfClient.Client.BaseURL()
+	setCustomTFEAddress := false
+	if defURL, perr := url.Parse(tfc.DefaultAddress); perr == nil && defURL.Host != bURL.Host {
+		setCustomTFEAddress = true
+	}
+
+	// Inject required environment vars into each container, preserving user-supplied values.
+	for ci := range d.Spec.Template.Spec.Containers {
+		envs := d.Spec.Template.Spec.Containers[ci].Env
+		envs = appendEnvVarIfMissing(envs, corev1.EnvVar{
+			Name:  "TFC_AGENT_AUTO_UPDATE",
+			Value: "disabled",
+		})
+		envs = appendEnvVarIfMissing(envs, corev1.EnvVar{
 			Name: "TFC_AGENT_TOKEN",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
@@ -204,35 +218,44 @@ func decorateDeployment(ap *agentPoolInstance, d *appsv1.Deployment) {
 					Key:                  ap.instance.Status.AgentTokens[0].Name,
 				},
 			},
-		},
-		{
+		})
+		envs = appendEnvVarIfMissing(envs, corev1.EnvVar{
 			Name: "TFC_AGENT_NAME",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: "metadata.name",
 				},
 			},
-		},
-		{
-			Name:  "TFC_AGENT_AUTO_UPDATE",
-			Value: "disabled",
-		},
-	}
-	// Set TFE_ADDRESS on agent Pod if differnet than default TFC endpoint.
-	bURL := ap.tfClient.Client.BaseURL()
-	if defURL, perr := url.Parse(tfc.DefaultAddress); perr == nil && defURL.Host != bURL.Host {
-		envs = append(envs, corev1.EnvVar{
-			Name:  "TFC_ADDRESS",
-			Value: bURL.String(),
 		})
-	}
-	// Inject agent specific environment vars to each container in the Deployment.
-	for ci := range d.Spec.Template.Spec.Containers {
-		d.Spec.Template.Spec.Containers[ci].Env = append(d.Spec.Template.Spec.Containers[ci].Env, envs...)
+		if setCustomTFEAddress {
+			envs = appendEnvVarIfMissing(envs, corev1.EnvVar{
+				Name:  "TFC_ADDRESS",
+				Value: bURL.String(),
+			})
+		}
+
+		d.Spec.Template.Spec.Containers[ci].Env = envs
 	}
 }
 
-func agentPoolDeploymentName(ap *appv1alpha2.AgentPool) string {
+func appendEnvVarIfMissing(envs []corev1.EnvVar, env corev1.EnvVar) []corev1.EnvVar {
+	if envVarExists(envs, env.Name) {
+		return envs
+	}
+
+	return append(envs, env)
+}
+
+func envVarExists(envs []corev1.EnvVar, name string) bool {
+	for _, env := range envs {
+		if env.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func AgentPoolDeploymentName(ap *appv1alpha2.AgentPool) string {
 	return fmt.Sprintf("agents-of-%s", ap.Name)
 }
 

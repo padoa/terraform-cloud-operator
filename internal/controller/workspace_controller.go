@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -14,7 +14,7 @@ import (
 	"github.com/go-logr/logr"
 	tfc "github.com/hashicorp/go-tfe"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -63,7 +63,7 @@ func (r *WorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		// 'Not found' error occurs when an object is removed from the Kubernetes
 		// No actions are required in this case
-		if errors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			w.log.Info("Workspace Controller", "msg", "the object is removed no further action is required")
 			return doNotRequeue()
 		}
@@ -75,6 +75,11 @@ func (r *WorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// - Think about using the DeleteFunc predicate.
 	if w.instance.DeletionTimestamp != nil && !controllerutil.ContainsFinalizer(&w.instance, workspaceFinalizer) {
 		w.log.Info("Workspace Controller", "msg", "object marked as deleted without finalizer, no further action is required")
+		return doNotRequeue()
+	}
+
+	if a, ok := w.instance.GetAnnotations()[annotationPaused]; ok && a == MetaTrue {
+		w.log.Info("Workspace Controller", "msg", "reconciliation is paused for this resource")
 		return doNotRequeue()
 	}
 
@@ -208,15 +213,15 @@ func needToUpdateWorkspace(instance *appv1alpha2.Workspace, workspace *tfc.Works
 	return false
 }
 
-// applyMethodToBool turns spec.applyMethod field into bool to align with the Workspace AutoApply field
+// ApplyMethodToBool turns spec.applyMethod field into bool to align with the Workspace AutoApply field
 // `spec.applyMethod: auto` is equal to `AutoApply: true`
 // `spec.applyMethod: manual` is equal to `AutoApply: false`
-func applyMethodToBool(applyMethod string) bool {
+func ApplyMethodToBool(applyMethod string) bool {
 	return applyMethod == "auto"
 }
 
 // autoApplyRunTriggerToBool turns spec.autoapplyRunTrigger field into bool
-func applyRunTriggerToBool(applyRunTrigger string) bool {
+func ApplyRunTriggerToBool(applyRunTrigger string) bool {
 	return applyRunTrigger == "auto"
 }
 
@@ -256,10 +261,11 @@ func (r *WorkspaceReconciler) createWorkspace(ctx context.Context, w *workspaceI
 	options := tfc.WorkspaceCreateOptions{
 		Name:                tfc.String(spec.Name),
 		AllowDestroyPlan:    tfc.Bool(spec.AllowDestroyPlan),
-		AutoApply:           tfc.Bool(applyMethodToBool(spec.ApplyMethod)),
-		AutoApplyRunTrigger: tfc.Bool(applyRunTriggerToBool(spec.ApplyRunTrigger)),
+		AutoApply:           tfc.Bool(ApplyMethodToBool(spec.ApplyMethod)),
+		AutoApplyRunTrigger: tfc.Bool(ApplyRunTriggerToBool(spec.ApplyRunTrigger)),
 		Description:         tfc.String(spec.Description),
 		ExecutionMode:       tfc.String(spec.ExecutionMode),
+		GlobalRemoteState:   tfc.Bool(false),
 		TerraformVersion:    tfc.String(spec.TerraformVersion),
 		WorkingDirectory:    tfc.String(spec.WorkingDirectory),
 	}
@@ -335,7 +341,9 @@ func (r *WorkspaceReconciler) readWorkspace(ctx context.Context, w *workspaceIns
 }
 
 func (r *WorkspaceReconciler) updateWorkspace(ctx context.Context, w *workspaceInstance, workspace *tfc.Workspace) (*tfc.Workspace, error) {
-	updateOptions := tfc.WorkspaceUpdateOptions{}
+	updateOptions := tfc.WorkspaceUpdateOptions{
+		GlobalRemoteState: tfc.Bool(false),
+	}
 	spec := w.instance.Spec
 	status := w.instance.Status
 
@@ -354,12 +362,12 @@ func (r *WorkspaceReconciler) updateWorkspace(ctx context.Context, w *workspaceI
 		updateOptions.Name = tfc.String(spec.Name)
 	}
 
-	if workspace.AutoApply != applyMethodToBool(spec.ApplyMethod) {
-		updateOptions.AutoApply = tfc.Bool(applyMethodToBool(spec.ApplyMethod))
+	if workspace.AutoApply != ApplyMethodToBool(spec.ApplyMethod) {
+		updateOptions.AutoApply = tfc.Bool(ApplyMethodToBool(spec.ApplyMethod))
 	}
 
-	if workspace.AutoApplyRunTrigger != applyRunTriggerToBool(spec.ApplyRunTrigger) {
-		updateOptions.AutoApplyRunTrigger = tfc.Bool(applyRunTriggerToBool(spec.ApplyRunTrigger))
+	if workspace.AutoApplyRunTrigger != ApplyRunTriggerToBool(spec.ApplyRunTrigger) {
+		updateOptions.AutoApplyRunTrigger = tfc.Bool(ApplyRunTriggerToBool(spec.ApplyRunTrigger))
 	}
 
 	if workspace.AllowDestroyPlan != spec.AllowDestroyPlan {
@@ -375,9 +383,7 @@ func (r *WorkspaceReconciler) updateWorkspace(ctx context.Context, w *workspaceI
 	}
 
 	if spec.RemoteStateSharing != nil {
-		if workspace.GlobalRemoteState != spec.RemoteStateSharing.AllWorkspaces {
-			updateOptions.GlobalRemoteState = tfc.Bool(spec.RemoteStateSharing.AllWorkspaces)
-		}
+		updateOptions.GlobalRemoteState = tfc.Bool(spec.RemoteStateSharing.AllWorkspaces)
 	}
 
 	if spec.TerraformVersion == "" {

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -18,14 +18,28 @@ import (
 	appv1alpha2 "github.com/hashicorp/hcp-terraform-operator/api/v1alpha2"
 )
 
-var (
-	runStatuses = strings.Join([]string{
-		string(tfc.RunPlanQueued),
-		string(tfc.RunApplyQueued),
-		string(tfc.RunApplying),
-		string(tfc.RunPlanning),
-	}, ",")
-)
+// userInteractionRunStatuses contains run statuses that require user interaction.
+var userInteractionRunStatuses = map[tfc.RunStatus]struct{}{
+	tfc.RunCostEstimated:            {},
+	tfc.RunPlanned:                  {},
+	tfc.RunPlannedAndSaved:          {},
+	tfc.RunPolicyOverride:           {},
+	tfc.RunPostPlanAwaitingDecision: {},
+	tfc.RunPostPlanCompleted:        {},
+	tfc.RunPending:                  {},
+	tfc.RunPolicyChecked:            {},
+}
+
+// terminalRunStatuses contains run statuses that represent a terminal plan-only run.
+// These are used to skip plan-only runs that have reached a terminal state
+// but may still be returned under status_group=non_final due to missing
+// terminal timestamps on the HCP Terraform API side.
+var terminalRunStatuses = map[tfc.RunStatus]struct{}{
+	tfc.RunPlannedAndFinished: {},
+	tfc.RunErrored:            {},
+	tfc.RunCanceled:           {},
+	tfc.RunDiscarded:          {},
+}
 
 // matchWildcardName checks if a given string matches a specified wildcard pattern.
 // The wildcard pattern can contain '*' at the beginning and/or end to match any sequence of characters.
@@ -60,25 +74,44 @@ func matchWildcardName(wildcard string, str string) bool {
 	}
 }
 
-// pendingWorkspaceRuns returns the number of workspaces with pending runs for a given agent pool.
+// pendingRuns returns the number pending runs for a given agent pool.
 // This function is compatible with HCP Terraform and TFE version v202409-1 and later.
-func pendingWorkspaceRuns(ctx context.Context, ap *agentPoolInstance) (int32, error) {
-	runs := map[string]struct{}{}
+func pendingRuns(ctx context.Context, ap *agentPoolInstance) (int32, error) {
+	applyRuns := map[string]struct{}{}
+	awaitingUserInteractionRuns := map[string]int{} // Track runs awaiting user interaction by status for future metrics
 	listOpts := &tfc.RunListForOrganizationOptions{
 		AgentPoolNames: ap.instance.Spec.Name,
-		Status:         runStatuses,
+		StatusGroup:    "non_final",
 		ListOptions: tfc.ListOptions{
-			PageSize:   maxPageSize,
-			PageNumber: 1,
+			PageSize:   MaxPageSize,
+			PageNumber: InitPageNumber,
 		},
 	}
+	planOnlyRuns := 0
 	for {
 		runsList, err := ap.tfClient.Client.Runs.ListForOrganization(ctx, ap.instance.Spec.Organization, listOpts)
 		if err != nil {
 			return 0, err
 		}
+
 		for _, run := range runsList.Items {
-			runs[run.Workspace.ID] = struct{}{}
+			// Skip runs that require user interaction
+			if _, ok := userInteractionRunStatuses[run.Status]; ok {
+				// Save the user interactable run statuses for future metrics with count split by status
+				awaitingUserInteractionRuns[string(run.Status)]++
+				continue
+			}
+			// Count plan-only runs separately so agents can scale up and execute runs parallely
+			if run.PlanOnly {
+				// Skip terminal plan-only runs. The API may return them under
+				// status_group=non_final when their finish timestamp is missing
+				if _, ok := terminalRunStatuses[run.Status]; ok {
+					continue
+				}
+				planOnlyRuns++
+				continue
+			}
+			applyRuns[run.Workspace.ID] = struct{}{}
 		}
 		if runsList.NextPage == 0 {
 			break
@@ -86,9 +119,15 @@ func pendingWorkspaceRuns(ctx context.Context, ap *agentPoolInstance) (int32, er
 		listOpts.PageNumber = runsList.NextPage
 	}
 
-	return int32(len(runs)), nil
+	// TODO:
+	// Add metric(s) for runs awaiting user interaction
+	totalPendingRuns := len(applyRuns) + planOnlyRuns
+	ap.log.Info("Reconcile Agent Autoscaling", "msg", fmt.Sprintf("apply/plan-only runs: %d/%d", len(applyRuns), planOnlyRuns))
+	return int32(totalPendingRuns), nil
 }
 
+// computeRequiredAgents is a legacy algorithm that is used to compute the number of agents needed.
+// It is used when the TFE version is less than v202409-1.
 func computeRequiredAgents(ctx context.Context, ap *agentPoolInstance) (int32, error) {
 	required := 0
 	// NOTE:
@@ -97,10 +136,15 @@ func computeRequiredAgents(ctx context.Context, ap *agentPoolInstance) (int32, e
 	workspaceIDs := map[string]struct{}{}
 
 	listOpts := &tfc.WorkspaceListOptions{
-		CurrentRunStatus: runStatuses,
+		CurrentRunStatus: strings.Join([]string{
+			string(tfc.RunPlanQueued),
+			string(tfc.RunApplyQueued),
+			string(tfc.RunApplying),
+			string(tfc.RunPlanning),
+		}, ","),
 		ListOptions: tfc.ListOptions{
-			PageSize:   maxPageSize,
-			PageNumber: 1,
+			PageSize:   MaxPageSize,
+			PageNumber: InitPageNumber,
 		},
 	}
 	for {
@@ -160,7 +204,7 @@ func computeDesiredReplicas(requiredAgents, minReplicas, maxReplicas int32) int3
 func getAgentDeploymentNamespacedName(ap *agentPoolInstance) types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: ap.instance.Namespace,
-		Name:      agentPoolDeploymentName(&ap.instance),
+		Name:      AgentPoolDeploymentName(&ap.instance),
 	}
 }
 
@@ -205,7 +249,7 @@ func (a *agentPoolInstance) cooldownSecondsRemaining(currentReplicas, desiredRep
 		if v := cooldownPeriod.ScaleUpSeconds; v != nil {
 			if desiredReplicas > currentReplicas {
 				cooldownPeriodSeconds = int(*v)
-				a.log.Info("Reconcile Agent Autoscaling", "msg", fmt.Sprintf("Agents scaling up, using configured scale down period: %v", cooldownPeriodSeconds))
+				a.log.Info("Reconcile Agent Autoscaling", "msg", fmt.Sprintf("Agents scaling up, using configured scale up period: %v", cooldownPeriodSeconds))
 			}
 		}
 	}
@@ -223,36 +267,36 @@ func (r *AgentPoolReconciler) reconcileAgentAutoscaling(ctx context.Context, ap 
 
 	requiredAgents, err := func() (int32, error) {
 		if ap.tfClient.Client.IsCloud() {
-			return pendingWorkspaceRuns(ctx, ap)
+			return pendingRuns(ctx, ap)
 		}
 		tfeVersion := ap.tfClient.Client.RemoteTFEVersion()
-		version, err := parseTFEVersion(tfeVersion)
+		runsEndpoint, err := useRunsEndpoint(tfeVersion)
 		if err != nil {
 			// If the TFE version parsing fails, do not return the error here and proceed further.
 			// In this case, a legacy algorithm will be taken.
 			ap.log.Error(err, "Reconcile Agent Autoscaling", "msg", "Failed to parse TFE version")
 			r.Recorder.Eventf(&ap.instance, corev1.EventTypeWarning, "AutoscaleAgentPool", "Failed to parse TFE version: %v", err.Error())
 		}
-		// In TFE version v202409-1, a new API endpoint was introduced.
+		// In TFE version v202409-1, a new Runs API endpoint was introduced.
 		// It now allows retrieving a list of runs for the organization.
-		if version >= 2024091 {
+		if runsEndpoint {
 			ap.log.Info("Reconcile Agent Autoscaling", "msg", fmt.Sprintf("Proceeding with the new algorithm based on the detected TFE version %s", tfeVersion))
-			return pendingWorkspaceRuns(ctx, ap)
+			return pendingRuns(ctx, ap)
 		}
 		ap.log.Info("Reconcile Agent Autoscaling", "msg", fmt.Sprintf("Proceeding with the legacy algorithm based to the detected TFE version %s", tfeVersion))
 		return computeRequiredAgents(ctx, ap)
 	}()
 	if err != nil {
 		ap.log.Error(err, "Reconcile Agent Autoscaling", "msg", "Failed to get agents needed")
-		r.Recorder.Eventf(&ap.instance, corev1.EventTypeWarning, "AutoscaleAgentPoolDeployment", "Autoscaling failed: %v", err.Error())
+		r.Recorder.Eventf(&ap.instance, corev1.EventTypeWarning, "AutoscaleAgentPool", "Failed to get agents needed: %v", err.Error())
 		return err
 	}
-	ap.log.Info("Reconcile Agent Autoscaling", "msg", fmt.Sprintf("%d workspaces have pending runs", requiredAgents))
+	ap.log.Info("Reconcile Agent Autoscaling", "msg", fmt.Sprintf("%d agents are required", requiredAgents))
 
 	currentReplicas, err := r.getAgentDeploymentReplicas(ctx, ap)
 	if err != nil {
 		ap.log.Error(err, "Reconcile Agent Autoscaling", "msg", "Failed to get current replicas")
-		r.Recorder.Eventf(&ap.instance, corev1.EventTypeWarning, "AutoscaleAgentPoolDeployment", "Autoscaling failed: %v", err.Error())
+		r.Recorder.Eventf(&ap.instance, corev1.EventTypeWarning, "AutoscaleAgentPool", "Failed to get current replicas: %v", err.Error())
 		return err
 	}
 	ap.log.Info("Reconcile Agent Autoscaling", "msg", fmt.Sprintf("%d agent replicas are running", currentReplicas))
@@ -269,11 +313,11 @@ func (r *AgentPoolReconciler) reconcileAgentAutoscaling(ctx context.Context, ap 
 
 		scalingEvent := fmt.Sprintf("Scaling agent deployment from %v to %v replicas", currentReplicas, desiredReplicas)
 		ap.log.Info("Reconcile Agent Autoscaling", "msg", strings.ToLower(scalingEvent))
-		r.Recorder.Event(&ap.instance, corev1.EventTypeNormal, "AutoscaleAgentPoolDeployment", scalingEvent)
+		r.Recorder.Event(&ap.instance, corev1.EventTypeNormal, "AutoscaleAgentPool", scalingEvent)
 		err := r.scaleAgentDeployment(ctx, ap, &desiredReplicas)
 		if err != nil {
 			ap.log.Error(err, "Reconcile Agent Autoscaling", "msg", "Failed to scale agent deployment")
-			r.Recorder.Eventf(&ap.instance, corev1.EventTypeWarning, "AutoscaleAgentPoolDeployment", "Autoscaling failed: %v", err.Error())
+			r.Recorder.Eventf(&ap.instance, corev1.EventTypeWarning, "AutoscaleAgentPool", "Failed to scale agent deployment: %v", err.Error())
 			return err
 		}
 		ap.instance.Status.AgentDeploymentAutoscalingStatus = &appv1alpha2.AgentDeploymentAutoscalingStatus{

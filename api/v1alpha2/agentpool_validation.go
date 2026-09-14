@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package v1alpha2
@@ -6,7 +6,7 @@ package v1alpha2
 import (
 	"fmt"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -18,19 +18,19 @@ func (ap *AgentPool) ValidateSpec() error {
 
 	// Validate labels
 	if ap.Spec.AgentDeployment != nil && ap.Spec.AgentDeployment.Labels != nil {
-		allErrs = append(allErrs, validateLabels(ap.Spec.AgentDeployment.Labels, field.NewPath("spec").Child("agentDeployment").Child("labels"))...)
+		allErrs = append(allErrs, validateDeploymentLabels(ap.Spec.AgentDeployment.Labels, field.NewPath("spec").Child("agentDeployment").Child("labels"))...)
 	}
 
 	// Validate annotations
 	if ap.Spec.AgentDeployment != nil && ap.Spec.AgentDeployment.Annotations != nil {
-		allErrs = append(allErrs, validateAnnotations(ap.Spec.AgentDeployment.Annotations, field.NewPath("spec").Child("agentDeployment").Child("annotations"))...)
+		allErrs = append(allErrs, validateDeploymentAnnotations(ap.Spec.AgentDeployment.Annotations, field.NewPath("spec").Child("agentDeployment").Child("annotations"))...)
 	}
 
 	if len(allErrs) == 0 {
 		return nil
 	}
 
-	return apierrors.NewInvalid(
+	return kerrors.NewInvalid(
 		schema.GroupKind{Group: "", Kind: "AgentPool"},
 		ap.Name,
 		allErrs,

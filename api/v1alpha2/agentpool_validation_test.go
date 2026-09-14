@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package v1alpha2
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/hcp-terraform-operator/internal/pointer"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateAgentPoolSpecAgentToken(t *testing.T) {
@@ -15,7 +16,7 @@ func TestValidateAgentPoolSpecAgentToken(t *testing.T) {
 	successCases := map[string]AgentPool{
 		"HasOnlyName": {
 			Spec: AgentPoolSpec{
-				AgentTokens: []*AgentToken{
+				AgentTokens: []*AgentAPIToken{
 					{
 						Name: "this",
 					},
@@ -24,7 +25,7 @@ func TestValidateAgentPoolSpecAgentToken(t *testing.T) {
 		},
 		"HasMultipleTokens": {
 			Spec: AgentPoolSpec{
-				AgentTokens: []*AgentToken{
+				AgentTokens: []*AgentAPIToken{
 					{
 						Name: "this",
 					},
@@ -38,16 +39,15 @@ func TestValidateAgentPoolSpecAgentToken(t *testing.T) {
 
 	for n, c := range successCases {
 		t.Run(n, func(t *testing.T) {
-			if errs := c.validateSpecAgentToken(); len(errs) != 0 {
-				t.Errorf("Unexpected validation errors: %v", errs)
-			}
+			errs := c.validateSpecAgentToken()
+			assert.Empty(t, errs, "Unexpected validation errors: %v", errs)
 		})
 	}
 
 	errorCases := map[string]AgentPool{
 		"HasID": {
 			Spec: AgentPoolSpec{
-				AgentTokens: []*AgentToken{
+				AgentTokens: []*AgentAPIToken{
 					{
 						Name: "this",
 						ID:   "this",
@@ -57,7 +57,7 @@ func TestValidateAgentPoolSpecAgentToken(t *testing.T) {
 		},
 		"HasCreatedAt": {
 			Spec: AgentPoolSpec{
-				AgentTokens: []*AgentToken{
+				AgentTokens: []*AgentAPIToken{
 					{
 						Name:      "this",
 						CreatedAt: pointer.PointerOf(int64(1984)),
@@ -67,7 +67,7 @@ func TestValidateAgentPoolSpecAgentToken(t *testing.T) {
 		},
 		"HasLastUsedAt": {
 			Spec: AgentPoolSpec{
-				AgentTokens: []*AgentToken{
+				AgentTokens: []*AgentAPIToken{
 					{
 						Name:       "this",
 						LastUsedAt: pointer.PointerOf(int64(1984)),
@@ -77,7 +77,7 @@ func TestValidateAgentPoolSpecAgentToken(t *testing.T) {
 		},
 		"HasDuplicateName": {
 			Spec: AgentPoolSpec{
-				AgentTokens: []*AgentToken{
+				AgentTokens: []*AgentAPIToken{
 					{
 						Name: "this",
 					},
@@ -91,9 +91,8 @@ func TestValidateAgentPoolSpecAgentToken(t *testing.T) {
 
 	for n, c := range errorCases {
 		t.Run(n, func(t *testing.T) {
-			if errs := c.validateSpecAgentToken(); len(errs) == 0 {
-				t.Error("Unexpected failure, at least one error is expected")
-			}
+			errs := c.validateSpecAgentToken()
+			assert.NotEmpty(t, errs, "Unexpected failure, at least one error is expected")
 		})
 	}
 }

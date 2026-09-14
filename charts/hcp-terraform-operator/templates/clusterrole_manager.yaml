@@ -1,5 +1,5 @@
 {{- if .Values.rbac.create -}}
-# Copyright (c) HashiCorp, Inc.
+# Copyright IBM Corp. 2022, 2025
 # SPDX-License-Identifier: MPL-2.0
 
 apiVersion: rbac.authorization.k8s.io/v1
@@ -18,6 +18,7 @@ rules:
   - list
   - update
   - watch
+  - patch
 - apiGroups:
   - ""
   resources:
@@ -29,8 +30,10 @@ rules:
   - app.terraform.io
   resources:
   - agentpools
+  - agenttokens
   - modules
   - projects
+  - runscollectors
   - workspaces
   verbs:
   - create
@@ -44,8 +47,10 @@ rules:
   - app.terraform.io
   resources:
   - agentpools/finalizers
+  - agenttokens/finalizers
   - modules/finalizers
   - projects/finalizers
+  - runscollectors/finalizers
   - workspaces/finalizers
   verbs:
   - update
@@ -53,8 +58,10 @@ rules:
   - app.terraform.io
   resources:
   - agentpools/status
+  - agenttokens/status
   - modules/status
   - projects/status
+  - runscollectors/status
   - workspaces/status
   verbs:
   - get

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package unit
@@ -48,10 +48,14 @@ func defaultDeployment() appsv1.Deployment {
 								"--sync-period=1h",
 								"--agent-pool-workers=1",
 								"--agent-pool-sync-period=30s",
+								"--agent-token-workers=1",
+								"--agent-token-sync-period=15m",
 								"--module-workers=1",
 								"--module-sync-period=5m",
 								"--project-workers=1",
 								"--project-sync-period=5m",
+								"--runs-collector-workers=1",
+								"--runs-collector-sync-period=15s",
 								"--workspace-workers=1",
 								"--workspace-sync-period=5m",
 							},
@@ -407,10 +411,14 @@ func TestDeploymentOperatorSyncPeriod(t *testing.T) {
 		"--sync-period=4h",
 		"--agent-pool-workers=1",
 		"--agent-pool-sync-period=30s",
+		"--agent-token-workers=1",
+		"--agent-token-sync-period=15m",
 		"--module-workers=1",
 		"--module-sync-period=5m",
 		"--project-workers=1",
 		"--project-sync-period=5m",
+		"--runs-collector-workers=1",
+		"--runs-collector-sync-period=15s",
 		"--workspace-workers=1",
 		"--workspace-sync-period=5m",
 	}
@@ -468,6 +476,25 @@ func TestDeploymentOperatorSkipTLSVerify(t *testing.T) {
 		{
 			Name:  "TFC_TLS_SKIP_VERIFY",
 			Value: "true",
+		},
+	}
+
+	assert.Equal(t, dd, deployment)
+}
+
+func TestDeploymentOperatorEnv(t *testing.T) {
+	options := &helm.Options{
+		SetValues: map[string]string{
+			"operator.env.HTTP_PROXY": "http://proxy:3128",
+		},
+		Version: helmChartVersion,
+	}
+	deployment := renderDeploymentManifest(t, options)
+	dd := defaultDeployment()
+	dd.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
+		{
+			Name:  "HTTP_PROXY",
+			Value: "http://proxy:3128",
 		},
 	}
 
@@ -555,14 +582,18 @@ func TestDeploymentKubeRbacProxyResources(t *testing.T) {
 func TestDeploymentControllers(t *testing.T) {
 	options := &helm.Options{
 		SetValues: map[string]string{
-			"controllers.agentPool.workers":    "5",
-			"controllers.agentPool.syncPeriod": "15m",
-			"controllers.module.workers":       "5",
-			"controllers.module.syncPeriod":    "15m",
-			"controllers.project.workers":      "5",
-			"controllers.project.syncPeriod":   "15m",
-			"controllers.workspace.workers":    "5",
-			"controllers.workspace.syncPeriod": "15m",
+			"controllers.agentPool.workers":        "5",
+			"controllers.agentPool.syncPeriod":     "15m",
+			"controllers.agentToken.workers":       "5",
+			"controllers.agentToken.syncPeriod":    "15m",
+			"controllers.module.workers":           "5",
+			"controllers.module.syncPeriod":        "15m",
+			"controllers.project.workers":          "5",
+			"controllers.project.syncPeriod":       "15m",
+			"controllers.runsCollector.workers":    "5",
+			"controllers.runsCollector.syncPeriod": "15m",
+			"controllers.workspace.workers":        "5",
+			"controllers.workspace.syncPeriod":     "15m",
 		},
 		Version: helmChartVersion,
 	}
@@ -572,10 +603,14 @@ func TestDeploymentControllers(t *testing.T) {
 		"--sync-period=1h",
 		"--agent-pool-workers=5",
 		"--agent-pool-sync-period=15m",
+		"--agent-token-workers=5",
+		"--agent-token-sync-period=15m",
 		"--module-workers=5",
 		"--module-sync-period=15m",
 		"--project-workers=5",
 		"--project-sync-period=15m",
+		"--runs-collector-workers=5",
+		"--runs-collector-sync-period=15m",
 		"--workspace-workers=5",
 		"--workspace-sync-period=15m",
 	}

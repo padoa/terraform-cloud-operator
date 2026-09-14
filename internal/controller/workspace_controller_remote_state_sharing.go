@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -17,7 +17,8 @@ func (r *WorkspaceReconciler) getWorkspaces(ctx context.Context, w *workspaceIns
 
 	listOpts := &tfc.WorkspaceListOptions{
 		ListOptions: tfc.ListOptions{
-			PageSize: maxPageSize,
+			PageSize:   MaxPageSize,
+			PageNumber: InitPageNumber,
 		},
 	}
 	for {
@@ -94,9 +95,10 @@ func (r *WorkspaceReconciler) reconcileRemoteStateSharing(ctx context.Context, w
 	}
 
 	if len(instanceRemoteStateSharing) > 0 {
-		err = w.tfClient.Client.Workspaces.UpdateRemoteStateConsumers(ctx, w.instance.Status.WorkspaceID, tfc.WorkspaceUpdateRemoteStateConsumersOptions{
+		o := tfc.WorkspaceUpdateRemoteStateConsumersOptions{
 			Workspaces: instanceRemoteStateSharing,
-		})
+		}
+		err = w.tfClient.Client.Workspaces.UpdateRemoteStateConsumers(ctx, w.instance.Status.WorkspaceID, o)
 		if err != nil {
 			return err
 		}

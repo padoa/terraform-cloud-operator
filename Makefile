@@ -52,7 +52,7 @@ OPERATOR_SDK_VERSION ?= v1.37.0
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.30.0
+ENVTEST_K8S_VERSION = 1.34.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -96,6 +96,7 @@ help: ## Display this help.
 .PHONY: docs
 docs: crd-ref-docs ## Generate API reference documentation.
 	$(CRD_REF_DOCS) --renderer=markdown \
+		--max-depth=20 \
 		--source-path ./api/v1alpha2/ \
 		--config=./docs/config.yaml \
 		--templates-dir=./docs/templates/markdown \
@@ -116,7 +117,6 @@ manifests: controller-gen docs ## Generate WebhookConfiguration, ClusterRole and
 	  output:crd:artifacts:config=config/crd/bases
 	$(CONTROLLER_GEN) crd paths="./..." \
 	  output:crd:artifacts:config=charts/hcp-terraform-operator/crds
-	$(MAKE) copywrite
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -131,26 +131,38 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: copywrite
-copywrite: install-copywrite ## Run copywrite against code.
-	$(HASHICORP_COPYWRITE) headers
+copywrite: ## Run copywrite against code.
+	@if ! command -v $(HASHICORP_COPYWRITE) >/dev/null 2>&1; then \
+		echo "$(HASHICORP_COPYWRITE) not found!"; \
+		echo "Run 'make install-copywrite' to install it."; \
+		exit 1; \
+	fi
+	$(HASHICORP_COPYWRITE) headers \
+		--year1 `git log --reverse --format=%ad --date=format:%Y | head -n 1` \
+		--year2 `git log -1 --format=%ad --date=format:%Y`
 
 .PHONY: test
-test: manifests generate fmt vet copywrite envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -timeout 45m -v ./internal/controller -coverprofile cover.out ${TESTARGS}
+test: manifests generate fmt vet envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+		go test -timeout 1h -v ./test/e2e -coverprofile cover.out ${TESTARGS}
 
 .PHONY: test-api
-test-api: fmt vet copywrite ## Run API tests.
+test-api: fmt vet ## Run API tests.
 	go test -timeout 5m -count 1 -v ./api/v1alpha2
 
 .PHONY: test-internal
-test-internal: fmt vet copywrite ## Run internal/* tests.
+test-internal: fmt vet ## Run internal/* tests.
 	go test -timeout 5m -count 1 -v \
 		./internal/pointer \
 		./internal/slice
 
+.PHONY: test-unit
+test-unit: fmt vet ## Run internal/controller tests.
+	go test -timeout 5m -count 1 -v ./internal/controller/...
+
 .PHONY: test-helm
 test-helm: ## Run Helm chart tests.
-	cd charts/test; go test -timeout 5m -count=1 -v ./...
+	cd charts/test; go test -timeout 5m -count 1 -v ./...
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
@@ -163,11 +175,11 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet copywrite ## Build manager binary.
+build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager ./cmd/main.go
 
 .PHONY: run
-run: manifests generate fmt vet copywrite ## Run a controller from your host.
+run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./cmd/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
@@ -234,6 +246,9 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
+## Tool Dirs
+HASHICORP_COPYWRITE_DIR ?= $(LOCALBIN)/copywrite_ibm
+
 ## Tool Binaries
 KUBECTL ?= kubectl
 KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
@@ -241,19 +256,18 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
 ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
 CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs-$(CRD_REF_DOCS_VERSION)
 HELM_DOCS ?= $(LOCALBIN)/helm-docs-$(HELM_DOCS_VERSION)
-HASHICORP_COPYWRITE ?= $(LOCALBIN)/copywrite-$(HASHICORP_COPYWRITE_VERSION)
+HASHICORP_COPYWRITE ?= $(LOCALBIN)/copywrite-ibm
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 YQ = $(LOCALBIN)/yq-$(YQ_VERSION)
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.16.5
-ENVTEST_VERSION ?= release-0.19
-CRD_REF_DOCS_VERSION ?= v0.1.0
+KUSTOMIZE_VERSION ?= v5.8.0
+CONTROLLER_TOOLS_VERSION ?= v0.19.0
+ENVTEST_VERSION ?= release-0.22
+CRD_REF_DOCS_VERSION ?= v0.2.0
 HELM_DOCS_VERSION ?= v1.14.2
-HASHICORP_COPYWRITE_VERSION ?= v0.19.0
-GOLANGCI_LINT_VERSION ?= v1.61.0
-YQ_VERSION ?= v4.44.3
+GOLANGCI_LINT_VERSION ?= v2.6.2
+YQ_VERSION ?= v4.49.2
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -288,7 +302,14 @@ $(HELM_DOCS): $(LOCALBIN)
 .PHONY: install-copywrite
 install-copywrite: $(HASHICORP_COPYWRITE) ## Download HashiCorp copywrite locally if necessary.
 $(HASHICORP_COPYWRITE): $(LOCALBIN)
-	$(call go-install-tool,$(HASHICORP_COPYWRITE),github.com/hashicorp/copywrite,$(HASHICORP_COPYWRITE_VERSION))
+	@if [ -d $(HASHICORP_COPYWRITE_DIR) ]; then \
+		git -C $(HASHICORP_COPYWRITE_DIR) pull; \
+	else \
+		mkdir -p $(LOCALBIN)/copywrite_ibm; \
+		git clone https://github.com/hashicorp/copywrite_ibm.git $(LOCALBIN)/copywrite_ibm; \
+	fi
+	cd $(HASHICORP_COPYWRITE_DIR); go build -o $(HASHICORP_COPYWRITE) .
+	rm -fr $(HASHICORP_COPYWRITE_DIR)
 
 .PHONY: yq
 yq: $(YQ) ## Download yq locally if necessary.

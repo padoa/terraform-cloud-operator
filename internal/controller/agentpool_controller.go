@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -11,8 +11,10 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/go-logr/logr"
+	tfc "github.com/hashicorp/go-tfe"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -22,8 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/go-logr/logr"
-	tfc "github.com/hashicorp/go-tfe"
 	appv1alpha2 "github.com/hashicorp/hcp-terraform-operator/api/v1alpha2"
 	"github.com/hashicorp/hcp-terraform-operator/version"
 )
@@ -59,12 +59,17 @@ func (r *AgentPoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		// 'Not found' error occurs when an object is removed from the Kubernetes
 		// No actions are required in this case
-		if errors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			ap.log.Info("Agent Pool Controller", "msg", "the object is removed no further action is required")
 			return doNotRequeue()
 		}
 		ap.log.Error(err, "Agent Pool Controller", "msg", "get instance object")
 		return requeueAfter(requeueInterval)
+	}
+
+	if a, ok := ap.instance.GetAnnotations()[annotationPaused]; ok && a == MetaTrue {
+		ap.log.Info("Agent Pool Controller", "msg", "reconciliation is paused for this resource")
+		return doNotRequeue()
 	}
 
 	ap.log.Info("Spec Validation", "msg", "validating instance object spec")

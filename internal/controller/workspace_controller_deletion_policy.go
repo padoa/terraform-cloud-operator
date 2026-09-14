@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -190,7 +190,7 @@ func (r *WorkspaceReconciler) handleWorkspaceErrorNotFound(ctx context.Context, 
 // reachable in practice, and falling through queues a new run as before.
 func findAdoptableDestroyRun(ctx context.Context, w *workspaceInstance) (*tfc.Run, error) {
 	runs, err := w.tfClient.Client.Runs.List(ctx, w.instance.Status.WorkspaceID, &tfc.RunListOptions{
-		ListOptions: tfc.ListOptions{PageNumber: 1, PageSize: maxPageSize},
+		ListOptions: tfc.ListOptions{PageNumber: InitPageNumber, PageSize: MaxPageSize},
 	})
 	if err != nil {
 		return nil, err

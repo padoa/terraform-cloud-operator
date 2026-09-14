@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -13,8 +13,11 @@ import (
 	"strconv"
 	"text/template"
 
+	"github.com/go-logr/logr"
+	"github.com/hashicorp/go-slug"
+	tfc "github.com/hashicorp/go-tfe"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -24,9 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/go-logr/logr"
-	"github.com/hashicorp/go-slug"
-	tfc "github.com/hashicorp/go-tfe"
 	appv1alpha2 "github.com/hashicorp/hcp-terraform-operator/api/v1alpha2"
 	"github.com/hashicorp/hcp-terraform-operator/version"
 )
@@ -75,12 +75,17 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err != nil {
 		// 'Not found' error occurs when an object is removed from the Kubernetes
 		// No actions are required in this case
-		if errors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			m.log.Info("Module Controller", "msg", "the instance was removed no further action is required")
 			return doNotRequeue()
 		}
 		m.log.Error(err, "Module Controller", "msg", "get instance object")
 		return requeueAfter(requeueInterval)
+	}
+
+	if a, ok := m.instance.GetAnnotations()[annotationPaused]; ok && a == MetaTrue {
+		m.log.Info("Module Controller", "msg", "reconciliation is paused for this resource")
+		return doNotRequeue()
 	}
 
 	m.log.Info("Spec Validation", "msg", "validating instance object spec")
@@ -398,8 +403,9 @@ func (r *ModuleReconciler) reconcileModule(ctx context.Context, m *moduleInstanc
 	if needNewRun(&m.instance) {
 		m.log.Info("Reconcile Run", "msg", "create a new run")
 		run, err := m.tfClient.Client.Runs.Create(ctx, tfc.RunCreateOptions{
-			Message:   tfc.String(runMessage),
-			Workspace: workspace,
+			Message:              tfc.String(runMessage),
+			Workspace:            workspace,
+			ConfigurationVersion: &tfc.ConfigurationVersion{ID: m.instance.Status.ConfigurationVersion.ID},
 		})
 		if err != nil {
 			m.log.Error(err, "Reconcile Run", "msg", "failed to create a new run")

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package v1alpha2
@@ -193,7 +193,7 @@ type ProjectStatus struct {
 
 // Project manages HCP Terraform Projects.
 // More information:
-// - https://developer.hashicorp.com/terraform/cloud-docs/projects/manage
+//   - https://developer.hashicorp.com/terraform/cloud-docs/projects/manage
 type Project struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

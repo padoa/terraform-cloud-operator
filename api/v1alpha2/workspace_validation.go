@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package v1alpha2
@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	tfc "github.com/hashicorp/go-tfe"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -33,7 +33,7 @@ func (w *Workspace) ValidateSpec() error {
 		return nil
 	}
 
-	return apierrors.NewInvalid(
+	return kerrors.NewInvalid(
 		schema.GroupKind{Group: "", Kind: "Workspace"},
 		w.Name,
 		allErrs,
@@ -262,14 +262,6 @@ func (w *Workspace) validateSpecRemoteStateSharing() field.ErrorList {
 	}
 
 	f := field.NewPath("spec").Child("remoteStateSharing")
-
-	if !spec.AllWorkspaces && len(spec.Workspaces) == 0 {
-		allErrs = append(allErrs, field.Invalid(
-			f,
-			"",
-			"one of AllWorkspaces or Workspaces must be set: AllWorkspaces must be true or Workspaces must have at least one item"),
-		)
-	}
 
 	if spec.AllWorkspaces && len(spec.Workspaces) != 0 {
 		allErrs = append(allErrs, field.Invalid(

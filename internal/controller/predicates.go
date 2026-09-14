@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -50,6 +50,11 @@ func genericPredicates() predicate.Predicate {
 				return true
 			}
 
+			// Continue with reconciliation if the app.terraform.io/paused annotation is set or has been removed.
+			if e.ObjectNew.GetAnnotations()[annotationPaused] != "" || e.ObjectOld.GetAnnotations()[annotationPaused] != "" {
+				return true
+			}
+
 			// Do not call reconciliation in all other cases
 			return false
 		},
@@ -76,7 +81,7 @@ func workspacePredicates() predicate.Predicate {
 			}
 			// Validate if a certain annotation persists in a new object and does not match the old one.
 			// In that case, it is a new or updated annotation and we need to trigger a reconciliation cycle.
-			if a, ok := e.ObjectNew.GetAnnotations()[workspaceAnnotationRunNew]; ok && a == annotationTrue {
+			if a, ok := e.ObjectNew.GetAnnotations()[WorkspaceAnnotationRunNew]; ok && a == MetaTrue {
 				return true
 			}
 
@@ -89,8 +94,10 @@ func workspacePredicates() predicate.Predicate {
 func deletionTimestampPredicate(o client.Object) bool {
 	finalizers := []string{
 		agentPoolFinalizer,
+		agentTokenFinalizer,
 		moduleFinalizer,
 		projectFinalizer,
+		runsCollectorFinalizer,
 		workspaceFinalizer,
 	}
 

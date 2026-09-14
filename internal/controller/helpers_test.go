@@ -1,15 +1,15 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	tfc "github.com/hashicorp/go-tfe"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -24,198 +24,311 @@ func (in *TestObject) DeepCopyObject() runtime.Object {
 	return nil
 }
 
-var _ = Describe("Helpers", Label("Unit"), func() {
-	Context("Returns", func() {
-		It("do not requeue", func() {
-			result, err := doNotRequeue()
-			Expect(result).To(BeEquivalentTo(reconcile.Result{}))
-			Expect(err).To(BeNil())
-		})
-		It("requeue after", func() {
-			duration := 1 * time.Second
-			result, err := requeueAfter(duration)
-			Expect(result).To(BeEquivalentTo(reconcile.Result{Requeue: true, RequeueAfter: duration}))
-			Expect(err).To(BeNil())
-		})
-		It("requeue on error", func() {
-			result, err := requeueOnErr(fmt.Errorf(""))
-			Expect(result).To(BeEquivalentTo(reconcile.Result{}))
-			Expect(err).ToNot(BeNil())
-		})
-	})
+func TestDoNotRequeue(t *testing.T) {
+	t.Parallel()
+	result, err := doNotRequeue()
+	assert.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, result)
+}
 
-	Context("FormatOutput", func() {
-		It("bool", func() {
-			o := &tfc.StateVersionOutput{
+func TestRequeueAfter(t *testing.T) {
+	t.Parallel()
+	duration := 1 * time.Second
+	result, err := requeueAfter(duration)
+	assert.NoError(t, err)
+	assert.Equal(t, reconcile.Result{Requeue: true, RequeueAfter: duration}, result)
+}
+
+func TestRequeueOnErr(t *testing.T) {
+	t.Parallel()
+	result, err := requeueOnErr(fmt.Errorf(""))
+	assert.Error(t, err)
+	assert.Equal(t, reconcile.Result{}, result)
+}
+
+func TestFormatOutput(t *testing.T) {
+	t.Parallel()
+	successCases := map[string]struct {
+		input    *tfc.StateVersionOutput
+		expected string
+	}{
+		"Boolean": {
+			input: &tfc.StateVersionOutput{
 				Type:  "boolean",
 				Value: true,
-			}
-			e := "true"
-			result, err := formatOutput(o)
-			Expect(result).To(BeEquivalentTo(e))
-			Expect(err).To(BeNil())
-		})
-		It("string", func() {
-			o := &tfc.StateVersionOutput{
+			},
+			expected: "true",
+		},
+		"String": {
+			input: &tfc.StateVersionOutput{
 				Type:  "string",
 				Value: "hello",
-			}
-			e := "hello"
-			result, err := formatOutput(o)
-			Expect(result).To(BeEquivalentTo(e))
-			Expect(err).To(BeNil())
-		})
-		It("multilineString", func() {
-			o := &tfc.StateVersionOutput{
+			},
+			expected: "hello",
+		},
+		"MultilineString": {
+			input: &tfc.StateVersionOutput{
 				Type:  "string",
 				Value: "hello\nworld",
-			}
-			e := "hello\nworld"
-			result, err := formatOutput(o)
-			Expect(result).To(BeEquivalentTo(e))
-			Expect(err).To(BeNil())
-		})
-		It("number", func() {
-			o := &tfc.StateVersionOutput{
+			},
+			expected: "hello\nworld",
+		},
+		"Number": {
+			input: &tfc.StateVersionOutput{
 				Type:  "number",
 				Value: 162,
-			}
-			e := "162"
-			result, err := formatOutput(o)
-			Expect(result).To(BeEquivalentTo(e))
-			Expect(err).To(BeNil())
-		})
-		It("list", func() {
-			o := &tfc.StateVersionOutput{
+			},
+			expected: "162",
+		},
+		"List": {
+			input: &tfc.StateVersionOutput{
 				Type: "array",
 				Value: []any{
 					"one",
 					2,
 				},
-			}
-			e := `["one",2]`
-			result, err := formatOutput(o)
-			Expect(result).To(BeEquivalentTo(e))
-			Expect(err).To(BeNil())
-		})
-		It("map", func() {
-			o := &tfc.StateVersionOutput{
-				Type: "array",
+			},
+			expected: `["one",2]`,
+		},
+		"Map": {
+			input: &tfc.StateVersionOutput{
+				Type: "map",
 				Value: map[string]string{
 					"one": "een",
 					"two": "twee",
 				},
-			}
-			e := `{"one":"een","two":"twee"}`
-			result, err := formatOutput(o)
-			Expect(result).To(BeEquivalentTo(e))
-			Expect(err).To(BeNil())
-		})
-	})
+			},
+			expected: `{"one":"een","two":"twee"}`,
+		},
+	}
 
-	Context("NeedToAddFinalizer", func() {
-		testFinalizer := "test.app.terraform.io/finalizer"
-		o := TestObject{}
-		It("No deletion timestamp and no finalizer", func() {
-			o.ObjectMeta.DeletionTimestamp = nil
-			o.ObjectMeta.Finalizers = []string{}
-			Expect(needToAddFinalizer(&o, testFinalizer)).To(BeTrue())
+	for n, c := range successCases {
+		t.Run(n, func(t *testing.T) {
+			result, err := formatOutput(c.input)
+			assert.NoError(t, err)
+			assert.Equal(t, c.expected, result)
 		})
-		It("No deletion timestamp and finalizer", func() {
-			o.ObjectMeta.DeletionTimestamp = nil
-			o.ObjectMeta.Finalizers = []string{testFinalizer}
-			Expect(needToAddFinalizer(&o, testFinalizer)).To(BeFalse())
-		})
-		It("Deletion timestamp and no finalizer", func() {
-			o.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-			o.ObjectMeta.Finalizers = []string{}
-			Expect(needToAddFinalizer(&o, testFinalizer)).To(BeFalse())
-		})
-		It("Deletion timestamp and finalizer", func() {
-			o.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-			o.ObjectMeta.Finalizers = []string{testFinalizer}
-			Expect(needToAddFinalizer(&o, testFinalizer)).To(BeFalse())
-		})
-	})
+	}
 
-	Context("IsDeletionCandidate", func() {
-		testFinalizer := "test.app.terraform.io/finalizer"
-		o := TestObject{}
-		It("No deletion timestamp and no finalizer", func() {
-			o.ObjectMeta.DeletionTimestamp = nil
-			o.ObjectMeta.Finalizers = []string{}
-			Expect(isDeletionCandidate(&o, testFinalizer)).To(BeFalse())
-		})
-		It("No deletion timestamp and finalizer", func() {
-			o.ObjectMeta.DeletionTimestamp = nil
-			o.ObjectMeta.Finalizers = []string{testFinalizer}
-			Expect(isDeletionCandidate(&o, testFinalizer)).To(BeFalse())
-		})
-		It("Deletion timestamp and no finalizer", func() {
-			o.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-			o.ObjectMeta.Finalizers = []string{}
-			Expect(isDeletionCandidate(&o, testFinalizer)).To(BeFalse())
-		})
-		It("Deletion timestamp and finalizer", func() {
-			o.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-			o.ObjectMeta.Finalizers = []string{testFinalizer}
-			Expect(isDeletionCandidate(&o, testFinalizer)).To(BeTrue())
-		})
-	})
+	errorCases := map[string]struct {
+		input    *tfc.StateVersionOutput
+		expected string
+	}{
+		"MalformedJSON": {
+			input: &tfc.StateVersionOutput{
+				Type: "map",
+				Value: map[string]any{
+					"one":  "een",
+					"func": func() {},
+				},
+			},
+			expected: "",
+		},
+	}
 
-	Context("Match wildcard name", func() {
-		// True
-		It("match prefix", func() {
-			result := matchWildcardName("*-terraform-workspace", "hcp-terraform-workspace")
-			Expect(result).To(BeTrue())
+	for n, c := range errorCases {
+		t.Run(n, func(t *testing.T) {
+			result, err := formatOutput(c.input)
+			assert.Error(t, err)
+			assert.Equal(t, c.expected, result)
 		})
-		It("match suffix", func() {
-			result := matchWildcardName("hcp-terraform-*", "hcp-terraform-workspace")
-			Expect(result).To(BeTrue())
-		})
-		It("match prefix and suffix", func() {
-			result := matchWildcardName("*-terraform-*", "hcp-terraform-workspace")
-			Expect(result).To(BeTrue())
-		})
-		It("match no prefix and no suffix", func() {
-			result := matchWildcardName("hcp-terraform-workspace", "hcp-terraform-workspace")
-			Expect(result).To(BeTrue())
-		})
-		// False
-		It("does not match prefix", func() {
-			result := matchWildcardName("*-terraform-workspace", "hcp-tf-workspace")
-			Expect(result).To(BeFalse())
-		})
-		It("does not match suffix", func() {
-			result := matchWildcardName("hcp-terraform-*", "hashicorp-tf-workspace")
-			Expect(result).To(BeFalse())
-		})
-		It("does not match prefix and suffix", func() {
-			result := matchWildcardName("*-terraform-*", "hcp-tf-workspace")
-			Expect(result).To(BeFalse())
-		})
-		It("does not match no prefix and no suffix", func() {
-			result := matchWildcardName("hcp-terraform-workspace", "hcp-tf-workspace")
-			Expect(result).To(BeFalse())
-		})
-	})
+	}
+}
 
-	Context("ParseTFEVersion", func() {
-		It("Valid TFE version", func() {
-			version := "v202502-1"
-			v, err := parseTFEVersion(version)
-			Expect(err).To(Succeed())
-			Expect(v).To(Equal(2025021))
+func TestNeedToAddFinalizer(t *testing.T) {
+	t.Parallel()
+	testFinalizer := "test.app.terraform.io/finalizer"
+	cases := map[string]struct {
+		o        *TestObject
+		expected bool
+	}{
+		"NoDeletionTimestampNoFinalizer": {
+			o: &TestObject{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: nil,
+					Finalizers:        []string{}},
+			},
+			expected: true,
+		},
+		"NoDeletionTimestampHasFinalizer": {
+			o: &TestObject{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: nil,
+					Finalizers:        []string{testFinalizer}},
+			},
+			expected: false,
+		},
+		"HasDeletionTimestampNoFinalizer": {
+			o: &TestObject{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{}},
+			},
+			expected: false,
+		},
+		"HasDeletionTimestampHasFinalizer": {
+			o: &TestObject{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{testFinalizer}},
+			},
+			expected: false,
+		},
+	}
+
+	for n, c := range cases {
+		t.Run(n, func(t *testing.T) {
+			result := needToAddFinalizer(c.o, testFinalizer)
+			assert.Equal(t, c.expected, result)
 		})
-		It("Invalid TFE version", func() {
-			version := "202502-1"
-			_, err := parseTFEVersion(version)
-			Expect(err).ToNot(Succeed())
+	}
+}
+
+func TestIsDeletionCandidate(t *testing.T) {
+	t.Parallel()
+	testFinalizer := "test.app.terraform.io/finalizer"
+	cases := map[string]struct {
+		o        *TestObject
+		expected bool
+	}{
+		"NoDeletionTimestampNoFinalizer": {
+			o: &TestObject{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: nil,
+					Finalizers:        []string{}},
+			},
+			expected: false,
+		},
+		"NoDeletionTimestampHasFinalizer": {
+			o: &TestObject{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: nil,
+					Finalizers:        []string{testFinalizer}},
+			},
+			expected: false,
+		},
+		"HasDeletionTimestampNoFinalizer": {
+			o: &TestObject{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{}},
+			},
+			expected: false,
+		},
+		"HasDeletionTimestampHasFinalizer": {
+			o: &TestObject{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{testFinalizer}},
+			},
+			expected: true,
+		},
+	}
+
+	for n, c := range cases {
+		t.Run(n, func(t *testing.T) {
+			result := isDeletionCandidate(c.o, testFinalizer)
+			assert.Equal(t, c.expected, result)
 		})
-		It("Empty TFE version", func() {
-			version := ""
-			_, err := parseTFEVersion(version)
-			Expect(err).ToNot(Succeed())
+	}
+}
+
+func TestMatchWildcardName(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		wildcard string
+		str      string
+		expected bool
+	}{
+		"MatchPrefix": {
+			wildcard: "*-terraform-workspace",
+			str:      "hcp-terraform-workspace",
+			expected: true,
+		},
+		"MatchSuffix": {
+			wildcard: "hcp-terraform-*",
+			str:      "hcp-terraform-workspace",
+			expected: true,
+		},
+		"MatchPrefixAndSuffix": {
+			wildcard: "*-terraform-*",
+			str:      "hcp-terraform-workspace",
+			expected: true,
+		},
+		"MatchNoPrefixNoSuffix": {
+			wildcard: "hcp-terraform-workspace",
+			str:      "hcp-terraform-workspace",
+			expected: true,
+		},
+		"DoesNotMatchPrefix": {
+			wildcard: "*-terraform-workspace",
+			str:      "hcp-tf-workspace",
+			expected: false,
+		},
+		"DoesNotMatchSuffix": {
+			wildcard: "hcp-terraform-*",
+			str:      "hashicorp-tf-workspace",
+			expected: false,
+		},
+		"DoesNotMatchPrefixAndSuffix": {
+			wildcard: "*-terraform-*",
+			str:      "hcp-tf-workspace",
+			expected: false,
+		},
+		"DeosNotMatchNoPrefixNoSuffix": {
+			wildcard: "hcp-terraform-workspace",
+			str:      "hcp-tf-workspace",
+			expected: false,
+		},
+	}
+
+	for n, c := range cases {
+		t.Run(n, func(t *testing.T) {
+			result := matchWildcardName(c.wildcard, c.str)
+			assert.Equal(t, c.expected, result)
 		})
-	})
-})
+	}
+}
+
+func TestUseRunsEndpoint(t *testing.T) {
+	t.Parallel()
+	successCases := map[string]struct {
+		version  string
+		expected bool
+	}{
+		"ValidTFEVersion": {
+			version:  "v202502-1",
+			expected: true,
+		},
+		"EmptyTFEVersion": {
+			version:  "",
+			expected: true,
+		},
+	}
+
+	for n, c := range successCases {
+		t.Run(n, func(t *testing.T) {
+			v, err := useRunsEndpoint(c.version)
+			assert.NoError(t, err)
+			assert.Equal(t, c.expected, v)
+		})
+	}
+
+	errorCases := map[string]struct {
+		version  string
+		expected bool
+	}{
+		"HasMissedVPrefix": {
+			version:  "202502-1",
+			expected: false,
+		},
+	}
+
+	for n, c := range errorCases {
+		t.Run(n, func(t *testing.T) {
+			v, err := useRunsEndpoint(c.version)
+			assert.Error(t, err)
+			assert.Equal(t, c.expected, v)
+		})
+	}
+}

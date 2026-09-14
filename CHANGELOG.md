@@ -1,3 +1,146 @@
+## 2.12.1 (August 18, 2026)
+
+BUG FIXES:
+
+* Fix issue with terminal plan only runs [[GH-718](https://github.com/hashicorp/hcp-terraform-operator/pull/718)]
+
+## 2.12.0 (July 28, 2026)
+
+BUG FIXES:
+
+* Use new go-tfe API to reference a full list of agent pool tokens and delete+recreate tokens only if absent [[GH-714](https://github.com/hashicorp/hcp-terraform-operator/pull/714)]
+
+DEPENDENCIES:
+
+* Bump dependencies and go version [[GH-715](https://github.com/hashicorp/hcp-terraform-operator/pull/715)]
+
+## 2.11.5 (April 29, 2026)
+
+BUG FIXES:
+
+* Add configuration version when creating a new run for Module Conroller to avoid unnecessary runs [[GH-711](https://github.com/hashicorp/hcp-terraform-operator/pull/711)]
+
+## 2.11.4 (April 22, 2026)
+
+BUG FIXES:
+
+* Fix issue with spec container env vars getting overridden by defaults [[GH-709](https://github.com/hashicorp/hcp-terraform-operator/pull/709)]
+
+## 2.11.3 (February 23, 2026)
+
+ENHANCEMENTS:
+
+* Support for PolicyChecked run status to help right  agent scale down [[GH-703](https://github.com/hashicorp/hcp-terraform-operator/pull/703)]
+
+## 2.11.2 (February 05, 2026)
+
+NOTES:
+
+* Due to technical issues, release 2.11.1 was not published; instead, release 2.11.2 replaces it.
+
+BUG FIXES:
+
+* `AgentPool`: Fixed an issue that could cause unnecessary agent scaling when runs were pending in specific scenarios. [[GH-694](https://github.com/hashicorp/hcp-terraform-operator/pull/694)]
+## 2.11.1 (January 27, 2026)
+
+BUG FIXES:
+
+* `PendingRuns`: This change fixes the unnecessary agent pods created for pending runs by adding a missing status in the user interaction statuses map [[GH-694](https://github.com/hashicorp/hcp-terraform-operator/pull/694)]
+
+## 2.11.0 (December 18, 2025)
+
+BUG FIXES:
+
+* `Workspace`: Fix an issue when Remote State Sharing was incorrectly handled and validated. It now correctly defaults to disabled when `spec.remoteStateSharing` is omitted, and no longer fails validation when `spec.remoteStateSharing.allWorkspaces` is set to `false` without specifying workspaces. [[GH-673](https://github.com/hashicorp/hcp-terraform-operator/pull/673)]
+* `AgentToken`: Fix an issue where the controller did not remove all managed tokens from the agent pool when the AgentToken custom resource was deleted. The operator now correctly cleans up all generated tokens during AgentToken deletion. [[GH-681](https://github.com/hashicorp/hcp-terraform-operator/pull/681)]
+* `AgentPool`: Fix an issue where the agent pool controller panics during token deletion. The panic occurred when a CR with multiple managed tokens was marked for deletion and the deletion policy was set to `destroy`. The controller now handles this scenario correctly. [[GH-680](https://github.com/hashicorp/hcp-terraform-operator/pull/680)]
+
+ENHANCEMENTS:
+
+* `AgentPool`: Agent autoscaling has been updated to include speculative (plan-only) runs when determining the desired agent count. [[GH-664](https://github.com/hashicorp/hcp-terraform-operator/pull/664)]
+
+DEPENDENCIES:
+
+* Bump `kube-rbac-proxy` from 0.20.0 to 0.20.1. [[GH-675](https://github.com/hashicorp/hcp-terraform-operator/pull/675)]
+* Bump `k8s.io/api` from 0.34.1 to 0.34.3. [[GH-682](https://github.com/hashicorp/hcp-terraform-operator/pull/682)]
+* Bump `k8s.io/apimachinery` from 0.34.1 to 0.34.3. [[GH-682](https://github.com/hashicorp/hcp-terraform-operator/pull/682)]
+* Bump `k8s.io/client-go` from 0.34.1 to 0.34.3. [[GH-682](https://github.com/hashicorp/hcp-terraform-operator/pull/682)]
+* Bump `github.com/hashicorp/go-tfe` from 1.93.0 to 1.97.0. [[GH-678](https://github.com/hashicorp/hcp-terraform-operator/pull/678)]
+* Bump `github.com/hashicorp/go-slug` from 0.16.7 to 0.18.1. [[GH-677](https://github.com/hashicorp/hcp-terraform-operator/pull/677)]
+
+## Community Contributors :raised_hands:
+
+We would like to say THANK YOU one more time to everyone who contributed to this project in 2025 and helped make it better in so many ways. We are looking forward to what the next year will bring and to the great features we will build together thanks to your feedback and contributions.
+
+- @AleksaC
+- @jrindy-iterable
+- @nhomble
+- @munnep
+- @baptman21
+
+Happy holidays! 🎉
+## 2.10.0 (November 12, 2025)
+
+NOTES:
+
+* `RunsCollector`: Add new Prometheus-compatible metrics `hcp_tf_runs` and `hcp_tf_runs_total` to collect pending runs by status and the total number of pending runs, respectively. These metrics are in the alpha stage and subject to change. [[GH-637](https://github.com/hashicorp/hcp-terraform-operator/pull/637)]
+
+BUG FIXES:
+
+* `Workspace`: Fix an issue where sensitive Terraform or Environment variables are not updated when their sensitivity changes. [[GH-629](https://github.com/hashicorp/hcp-terraform-operator/pull/629)]
+* `AgentPool`: Exclude runs awaiting user interaction from scaling to prevent agents from being kept unnecessarily active. [[GH-618](https://github.com/hashicorp/hcp-terraform-operator/pull/618)]
+* `AgentPool`: Fix version parsing for Terraform Enterprise version format changes. [[GH-641](https://github.com/hashicorp/hcp-terraform-operator/pull/641)]
+
+FEATURES:
+
+* `RunsCollector`: Introduce a new controller that scrapes HCP Terraform run statuses from a specified Agent Pool and exposes them as Prometheus-compatible metrics. [[GH-637](https://github.com/hashicorp/hcp-terraform-operator/pull/637)]
+* `AgentToken`: Introduce a new controller that manages tokens in arbitrary agent pools. [[GH-628](https://github.com/hashicorp/hcp-terraform-operator/pull/628)]
+
+ENHANCEMENTS:
+
+* `Controllers`: Add a new annotation, `app.terraform.io/paused`, to pause reconciliation for a specific CR. [[GH-631](https://github.com/hashicorp/hcp-terraform-operator/pull/631)]
+* `AgentPool`: Update Kubernetes Secret synchronization to perform batch updates at the end of agent token reconciliation, reducing API calls and preventing race conditions. [[GH-650](https://github.com/hashicorp/hcp-terraform-operator/pull/650)]
+
+DEPENDENCIES:
+
+* Bump `kube-rbac-proxy` from 0.19.1 to 0.20.0. [[GH-640](https://github.com/hashicorp/hcp-terraform-operator/pull/640)]
+* Bump `k8s.io/api` from 0.32.3 to 0.34.1. [[GH-643](https://github.com/hashicorp/hcp-terraform-operator/pull/643)]
+* Bump `k8s.io/apimachinery` from 0.32.3 to 0.34.1. [[GH-643](https://github.com/hashicorp/hcp-terraform-operator/pull/643)]
+* Bump `github.com/hashicorp/go-slug` from 0.16.4 to 0.16.7. [[GH-644](https://github.com/hashicorp/hcp-terraform-operator/pull/644)]
+* Bump `github.com/hashicorp/go-tfe` from 1.76.0 to 1.93.0. [[GH-644](https://github.com/hashicorp/hcp-terraform-operator/pull/644)]
+* Bump `k8s.io/client-go` from 0.32.3 to 0.34.1. [[GH-643](https://github.com/hashicorp/hcp-terraform-operator/pull/643)]
+* Bump `sigs.k8s.io/controller-runtime` from 0.20.4 to 0.22.4. [[GH-643](https://github.com/hashicorp/hcp-terraform-operator/pull/643)]
+
+## Community Contributors :raised_hands:
+
+- @AleksaC made their contribution in https://github.com/hashicorp/hcp-terraform-operator/pull/617
+- @jrindy-iterable made their contribution in https://github.com/hashicorp/hcp-terraform-operator/pull/618
+- @nhomble made their contribution in https://github.com/hashicorp/hcp-terraform-operator/pull/627
+
+## 2.9.2 (May 28, 2025)
+
+BUG FIXES:
+
+* Fix an issue where the agent can be terminated while it still has an active run during the post-plan or post-apply stage, such as, but not limited to, Sentinel policy evaluation. [[GH-610](https://github.com/hashicorp/hcp-terraform-operator/pull/610)]
+
+## Community Contributors :raised_hands:
+
+- @munnep identified and successfully reproduced the issue. Great work tracking it down! https://github.com/hashicorp/hcp-terraform-operator/pull/610
+
+## 2.9.1 (May 14, 2025)
+
+BUG FIXES:
+
+* Fixed an issue where the operator could not connect to the HCP Terraform / TFE instance when using the UBI-based image due to a TLS validation error. The previous workaround required setting the `TFC_TLS_SKIP_VERIFY` environment variable to `true` in the Deployment. [[GH-600](https://github.com/hashicorp/hcp-terraform-operator/pull/600)]
+
+ENHANCEMENTS:
+
+* `Helm Chart`: Add the ability to configure environment variables for the Operator Deployment via `operator.env`. [[GH-601](https://github.com/hashicorp/hcp-terraform-operator/pull/601)]
+
+DEPENDENCIES:
+
+* Bump `kube-rbac-proxy` from 0.19.0 to 0.19.1. [[GH-599](https://github.com/hashicorp/hcp-terraform-operator/pull/599)]
+
 ## 2.9.0 (April 24, 2025)
 
 BREAKING CHANGES:

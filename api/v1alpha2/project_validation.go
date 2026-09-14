@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package v1alpha2
@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	tfc "github.com/hashicorp/go-tfe"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -21,7 +21,7 @@ func (p *Project) ValidateSpec() error {
 		return nil
 	}
 
-	return apierrors.NewInvalid(
+	return kerrors.NewInvalid(
 		schema.GroupKind{Group: "", Kind: "Project"},
 		p.Name,
 		allErrs,

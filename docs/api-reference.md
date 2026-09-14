@@ -10,10 +10,35 @@ Package v1alpha2 contains API Schema definitions for the app v1alpha2 API group
 
 ### Resource Types
 - [AgentPool](#agentpool)
+- [AgentToken](#agenttoken)
 - [Module](#module)
 - [Project](#project)
+- [RunsCollector](#runscollector)
 - [Workspace](#workspace)
 
+
+
+#### AgentAPIToken
+
+
+
+Agent Token is a secret token that a HCP Terraform Agent is used to connect to the HCP Terraform Agent Pool.
+In `spec` only the field `Name` is allowed, the rest are used in `status`.
+More infromation:
+  - https://developer.hashicorp.com/terraform/cloud-docs/agents
+
+_Appears in:_
+- [AgentPoolSpec](#agentpoolspec)
+- [AgentPoolStatus](#agentpoolstatus)
+- [AgentTokenSpec](#agenttokenspec)
+- [AgentTokenStatus](#agenttokenstatus)
+
+| Field | Description |
+| --- | --- |
+| `name` _string_ | Agent Token name. |
+| `id` _string_ | Agent Token ID. |
+| `createdAt` _integer_ | Timestamp of when the agent token was created. |
+| `lastUsedAt` _integer_ | Timestamp of when the agent token was last used. |
 
 
 #### AgentDeployment
@@ -28,7 +53,7 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `replicas` _integer_ |  |
-| `spec` _[PodSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podspec-v1-core)_ |  |
+| `spec` _[PodSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podspec-v1-core)_ |  |
 | `annotations` _object (keys:string, values:string)_ | The annotations that the operator will apply to the pod template in the deployment. |
 | `labels` _object (keys:string, values:string)_ | The labels that the operator will apply to the pod template in the deployment. |
 
@@ -79,7 +104,7 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `desiredReplicas` _integer_ | Desired number of agent replicas |
-| `lastScalingEvent` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta)_ | Last time the agent pool was scaledx |
+| `lastScalingEvent` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#time-v1-meta)_ | Last time the agent pool was scaledx |
 
 
 #### AgentPool
@@ -100,7 +125,7 @@ More infromation:
 | `kind` _string_ | `AgentPool`
 | `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
 | `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
 | `spec` _[AgentPoolSpec](#agentpoolspec)_ |  |
 
 
@@ -118,6 +143,29 @@ _Appears in:_
 
 
 
+#### AgentPoolRef
+
+
+
+AgentPool allows HCP Terraform to communicate with isolated, private, or on-premises infrastructure.
+Only one of the fields `ID` or `Name` is allowed.
+At least one of the fields `ID` or `Name` is mandatory.
+More information:
+  - https://developer.hashicorp.com/terraform/cloud-docs/agents
+
+_Appears in:_
+- [AgentTokenSpec](#agenttokenspec)
+- [AgentTokenStatus](#agenttokenstatus)
+- [RunsCollectorSpec](#runscollectorspec)
+- [RunsCollectorStatus](#runscollectorstatus)
+- [WorkspaceSpec](#workspacespec)
+
+| Field | Description |
+| --- | --- |
+| `id` _string_ | Agent Pool ID.<br />Must match pattern: `^apool-[a-zA-Z0-9]+$` |
+| `name` _string_ | Agent Pool name. |
+
+
 #### AgentPoolSpec
 
 
@@ -132,7 +180,7 @@ _Appears in:_
 | `name` _string_ | Agent Pool name.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/agents/agent-pools |
 | `organization` _string_ | Organization name where the Workspace will be created.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/users-teams-organizations/organizations |
 | `token` _[Token](#token)_ | API Token to be used for API calls. |
-| `agentTokens` _[AgentToken](#agenttoken) array_ | List of the agent tokens to generate. |
+| `agentTokens` _[AgentAPIToken](#agentapitoken) array_ | List of the agent tokens to generate. |
 | `agentDeployment` _[AgentDeployment](#agentdeployment)_ | Agent deployment settings |
 | `autoscaling` _[AgentDeploymentAutoscaling](#agentdeploymentautoscaling)_ | Agent deployment settings |
 | `deletionPolicy` _[AgentPoolDeletionPolicy](#agentpooldeletionpolicy)_ | The Deletion Policy specifies the behavior of the custom resource and its associated agent pool when the custom resource is deleted.<br />- `retain`: When you delete the custom resource, the operator will remove only the custom resource.<br />  The HCP Terraform agent pool will be retained. The managed tokens will remain active on the HCP Terraform side; however, the corresponding secrets and managed agents will be removed.<br />- `destroy`: The operator will attempt to remove the managed HCP Terraform agent pool.<br />  On success, the managed agents and the corresponding secret with tokens will be removed along with the custom resource.<br />  On failure, the managed agents will be scaled down to 0, and the managed tokens, along with the corresponding secret, will be removed. The operator will continue attempting to remove the agent pool until it succeeds.<br />Default: `retain`. |
@@ -144,21 +192,69 @@ _Appears in:_
 
 
 
-Agent Token is a secret token that a HCP Terraform Agent is used to connect to the HCP Terraform Agent Pool.
-In `spec` only the field `Name` is allowed, the rest are used in `status`.
-More infromation:
-  - https://developer.hashicorp.com/terraform/cloud-docs/agents
+AgentToken manages HCP Terraform Agent Tokens.
+More information:
+- https://developer.hashicorp.com/terraform/cloud-docs/users-teams-organizations/api-tokens#agent-api-tokens
 
-_Appears in:_
-- [AgentPoolSpec](#agentpoolspec)
-- [AgentPoolStatus](#agentpoolstatus)
+
 
 | Field | Description |
 | --- | --- |
-| `name` _string_ | Agent Token name. |
-| `id` _string_ | Agent Token ID. |
-| `createdAt` _integer_ | Timestamp of when the agent token was created. |
-| `lastUsedAt` _integer_ | Timestamp of when the agent token was last used. |
+| `apiVersion` _string_ | `app.terraform.io/v1alpha2`
+| `kind` _string_ | `AgentToken`
+| `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
+| `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `spec` _[AgentTokenSpec](#agenttokenspec)_ |  |
+
+
+#### AgentTokenDeletionPolicy
+
+_Underlying type:_ _string_
+
+The Deletion Policy defines how managed tokens and Kubernetes Secrets should be handled when the custom resource is deleted.
+  - `retain`: When the custom resource is deleted, the operator will remove only the resource itself.
+    The managed HCP Terraform Agent tokens will remain active on the HCP Terraform side, and the corresponding Kubernetes Secret will not be modified.
+  - `destroy`: The operator will attempt to delete the managed HCP Terraform Agent tokens and remove the corresponding Kubernetes Secret.
+
+_Appears in:_
+- [AgentTokenSpec](#agenttokenspec)
+
+
+
+#### AgentTokenManagementPolicy
+
+_Underlying type:_ _string_
+
+The Management Policy defines how the controller will manage tokens in the specified Agent Pool.
+- `merge`  — the controller will manage its tokens alongside any existing tokens in the pool, without modifying or deleting tokens it does not own.
+- `owner`  — the controller assumes full ownership of all agent tokens in the pool, managing and potentially modifying or deleting all tokens, including those not created by it.
+
+_Appears in:_
+- [AgentTokenSpec](#agenttokenspec)
+
+
+
+#### AgentTokenSpec
+
+
+
+AgentTokenSpec defines the desired state of AgentToken.
+
+_Appears in:_
+- [AgentToken](#agenttoken)
+
+| Field | Description |
+| --- | --- |
+| `organization` _string_ | Organization name where the Workspace will be created.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/users-teams-organizations/organizations |
+| `token` _[Token](#token)_ | API Token to be used for API calls. |
+| `deletionPolicy` _[AgentTokenDeletionPolicy](#agenttokendeletionpolicy)_ | The Deletion Policy defines how managed tokens and Kubernetes Secrets should be handled when the custom resource is deleted.<br />- `retain`: When the custom resource is deleted, the operator will remove only the resource itself.<br />  The managed HCP Terraform Agent tokens will remain active on the HCP Terraform side, and the corresponding Kubernetes Secret will not be modified.<br />- `destroy`: The operator will attempt to delete the managed HCP Terraform Agent tokens and remove the corresponding Kubernetes Secret.<br />Default: `retain`. |
+| `agentPool` _[AgentPoolRef](#agentpoolref)_ | The Agent Pool name or ID where the tokens will be managed. |
+| `managementPolicy` _[AgentTokenManagementPolicy](#agenttokenmanagementpolicy)_ | The Management Policy defines how the controller will manage tokens in the specified Agent Pool.<br />- `merge`  — the controller will manage its tokens alongside any existing tokens in the pool, without modifying or deleting tokens it does not own.<br />- `owner`  — the controller assumes full ownership of all agent tokens in the pool, managing and potentially modifying or deleting all tokens, including those not created by it.<br />Default: `merge`. |
+| `agentTokens` _[AgentAPIToken](#agentapitoken) array_ | List of the HCP Terraform Agent tokens to manage. |
+| `secretName` _string_ | secretName specifies the name of the Kubernetes Secret<br />where the HCP Terraform Agent tokens are stored. |
+
+
 
 
 #### ConfigurationVersionStatus
@@ -251,7 +347,6 @@ _Underlying type:_ _string_
 
 DeletionPolicy defines the strategy the Kubernetes operator uses when you delete a resource, either manually or by a system event.
 
-
 You must use one of the following values:
 - `retain`: When you delete the custom resource, the operator does not delete the workspace.
 - `soft`: Attempts to delete the associated workspace only if it does not contain any managed resources.
@@ -279,7 +374,7 @@ More information:
 | `kind` _string_ | `Module`
 | `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
 | `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
 | `spec` _[ModuleSpec](#modulespec)_ |  |
 
 
@@ -290,7 +385,6 @@ _Underlying type:_ _string_
 Deletion Policy defines the strategies for resource deletion in the Kubernetes operator.
 It controls how the operator should handle the deletion of resources when triggered by
 a user action or system event.
-
 
 There is one possible value:
 - `retain`: When the custom resource is deleted, the associated module is retained. `destroyOnDeletion` must be set to false. Default value.
@@ -351,7 +445,7 @@ _Appears in:_
 | `outputs` _[ModuleOutput](#moduleoutput) array_ | Module outputs to store in ConfigMap(non-sensitive) or Secret(sensitive). |
 | `destroyOnDeletion` _boolean_ | DEPRECATED: Specify whether or not to execute a Destroy run when the object is deleted from the Kubernetes.<br />Default: `false`. |
 | `restartedAt` _string_ | Allows executing a new Run without changing any Workspace or Module attributes.<br />Example: kubectl patch <KIND> <NAME> --type=merge --patch '\{"spec": \{"restartedAt": "'\`date -u -Iseconds\`'"\}\}' |
-| `deletionPolicy` _[ModuleDeletionPolicy](#moduledeletionpolicy)_ | Deletion Policy defines the strategies for resource deletion in the Kubernetes operator.<br />It controls how the operator should handle the deletion of resources when triggered by<br />a user action or system event.<br /><br />There is one possible value:<br />- `retain`: When the custom resource is deleted, the associated module is retained. `destroyOnDeletion` must be set to false.<br />- `destroy`: Executes a destroy operation. Removes all resources and the module.<br />Default: `retain`. |
+| `deletionPolicy` _[ModuleDeletionPolicy](#moduledeletionpolicy)_ | Deletion Policy defines the strategies for resource deletion in the Kubernetes operator.<br />It controls how the operator should handle the deletion of resources when triggered by<br />a user action or system event.<br />There is one possible value:<br />- `retain`: When the custom resource is deleted, the associated module is retained. `destroyOnDeletion` must be set to false.<br />- `destroy`: Executes a destroy operation. Removes all resources and the module.<br />Default: `retain`. |
 
 
 
@@ -458,7 +552,7 @@ _Appears in:_
 
 Project manages HCP Terraform Projects.
 More information:
-- https://developer.hashicorp.com/terraform/cloud-docs/projects/manage
+  - https://developer.hashicorp.com/terraform/cloud-docs/projects/manage
 
 
 
@@ -468,7 +562,7 @@ More information:
 | `kind` _string_ | `Project`
 | `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
 | `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
 | `spec` _[ProjectSpec](#projectspec)_ |  |
 
 
@@ -477,7 +571,6 @@ More information:
 _Underlying type:_ _string_
 
 DeletionPolicy defines the strategy the Kubernetes operator uses when you delete a project, either manually or by a system event.
-
 
 You must use one of the following values:
 - `retain`: When the custom resource is deleted, the operator will not delete the associated project.
@@ -505,7 +598,7 @@ _Appears in:_
 | `token` _[Token](#token)_ | API Token to be used for API calls. |
 | `name` _string_ | Name of the Project. |
 | `teamAccess` _[ProjectTeamAccess](#projectteamaccess) array_ | HCP Terraform's access model is team-based. In order to perform an action within a HCP Terraform organization,<br />users must belong to a team that has been granted the appropriate permissions.<br />You can assign project-specific permissions to teams.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/workspaces/organize-workspaces-with-projects#permissions<br />  - https://developer.hashicorp.com/terraform/cloud-docs/users-teams-organizations/permissions#project-permissions |
-| `deletionPolicy` _[ProjectDeletionPolicy](#projectdeletionpolicy)_ | DeletionPolicy defines the strategy the Kubernetes operator uses when you delete a project, either manually or by a system event.<br /><br />You must use one of the following values:<br />- `retain`:  When the custom resource is deleted, the operator will not delete the associated project.<br />- `soft`: Attempts to remove the project. The project must be empty.<br />Default: `retain`. |
+| `deletionPolicy` _[ProjectDeletionPolicy](#projectdeletionpolicy)_ | DeletionPolicy defines the strategy the Kubernetes operator uses when you delete a project, either manually or by a system event.<br />You must use one of the following values:<br />- `retain`:  When the custom resource is deleted, the operator will not delete the associated project.<br />- `soft`: Attempts to remove the project. The project must be empty.<br />Default: `retain`. |
 
 
 
@@ -616,6 +709,44 @@ _Appears in:_
 | `name` _string_ | Source Workspace Name. |
 
 
+#### RunsCollector
+
+
+
+RunsCollector scraptes HCP Terraform Run statuses from a given Agent Pool and exposes them as Prometheus-compatible metrics.
+More information:
+  - https://developer.hashicorp.com/terraform/cloud-docs/run/remote-operations
+
+
+
+| Field | Description |
+| --- | --- |
+| `apiVersion` _string_ | `app.terraform.io/v1alpha2`
+| `kind` _string_ | `RunsCollector`
+| `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
+| `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `spec` _[RunsCollectorSpec](#runscollectorspec)_ |  |
+
+
+#### RunsCollectorSpec
+
+
+
+
+
+_Appears in:_
+- [RunsCollector](#runscollector)
+
+| Field | Description |
+| --- | --- |
+| `organization` _string_ | Organization name where the Workspace will be created.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/users-teams-organizations/organizations |
+| `token` _[Token](#token)_ | API Token to be used for API calls. |
+| `agentPool` _[AgentPoolRef](#agentpoolref)_ | The Agent Pool name or ID from which the controller will collect runs.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/run/states |
+
+
+
+
 #### SSHKey
 
 
@@ -714,13 +845,15 @@ Token refers to a Kubernetes Secret object within the same namespace as the Work
 
 _Appears in:_
 - [AgentPoolSpec](#agentpoolspec)
+- [AgentTokenSpec](#agenttokenspec)
 - [ModuleSpec](#modulespec)
 - [ProjectSpec](#projectspec)
+- [RunsCollectorSpec](#runscollectorspec)
 - [WorkspaceSpec](#workspacespec)
 
 | Field | Description |
 | --- | --- |
-| `secretKeyRef` _[SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#secretkeyselector-v1-core)_ | Selects a key of a secret in the workspace's namespace |
+| `secretKeyRef` _[SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#secretkeyselector-v1-core)_ | Selects a key of a secret in the workspace's namespace |
 
 
 #### ValueFrom
@@ -735,8 +868,8 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `configMapKeyRef` _[ConfigMapKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#configmapkeyselector-v1-core)_ | Selects a key of a ConfigMap. |
-| `secretKeyRef` _[SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#secretkeyselector-v1-core)_ | Selects a key of a Secret. |
+| `configMapKeyRef` _[ConfigMapKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#configmapkeyselector-v1-core)_ | Selects a key of a ConfigMap. |
+| `secretKeyRef` _[SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#secretkeyselector-v1-core)_ | Selects a key of a Secret. |
 
 
 #### Variable
@@ -833,27 +966,8 @@ More information:
 | `kind` _string_ | `Workspace`
 | `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
 | `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
 | `spec` _[WorkspaceSpec](#workspacespec)_ |  |
-
-
-#### WorkspaceAgentPool
-
-
-
-AgentPool allows HCP Terraform to communicate with isolated, private, or on-premises infrastructure.
-Only one of the fields `ID` or `Name` is allowed.
-At least one of the fields `ID` or `Name` is mandatory.
-More information:
-  - https://developer.hashicorp.com/terraform/cloud-docs/agents
-
-_Appears in:_
-- [WorkspaceSpec](#workspacespec)
-
-| Field | Description |
-| --- | --- |
-| `id` _string_ | Agent Pool ID.<br />Must match pattern: `^apool-[a-zA-Z0-9]+$` |
-| `name` _string_ | Agent Pool name. |
 
 
 #### WorkspaceProject
@@ -914,7 +1028,7 @@ _Appears in:_
 | `applyRunTrigger` _string_ | Specifies the type of apply, whether manual or auto<br />Must be of value `auto` or `manual`<br />Default: `manual`<br />More information:<br />- https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings#auto-apply |
 | `allowDestroyPlan` _boolean_ | Allows a destroy plan to be created and applied.<br />Default: `true`.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings#destruction-and-deletion |
 | `description` _string_ | Workspace description. |
-| `agentPool` _[WorkspaceAgentPool](#workspaceagentpool)_ | HCP Terraform Agents allow HCP Terraform to communicate with isolated, private, or on-premises infrastructure.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/agents |
+| `agentPool` _[AgentPoolRef](#agentpoolref)_ | HCP Terraform Agents allow HCP Terraform to communicate with isolated, private, or on-premises infrastructure.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/agents |
 | `executionMode` _string_ | Define where the Terraform code will be executed.<br />Must be one of the following values: `agent`, `local`, `remote`.<br />Default: `remote`.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings#execution-mode |
 | `runTasks` _[WorkspaceRunTask](#workspaceruntask) array_ | Run tasks allow HCP Terraform to interact with external systems at specific points in the HCP Terraform run lifecycle.<br />More information:<br />  - https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings/run-tasks |
 | `tags` _[Tag](#tag) array_ | Workspace tags are used to help identify and group together workspaces.<br />Tags must be one or more characters; can include letters, numbers, colons, hyphens, and underscores; and must begin and end with a letter or number. |

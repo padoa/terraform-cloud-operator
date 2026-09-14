@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -100,12 +100,25 @@ func secretKeyRef(ctx context.Context, c client.Client, nn types.NamespacedName,
 	return "", fmt.Errorf("unable to find key=%q in secret=%q namespace=%q", key, nn.Name, nn.Namespace)
 }
 
-func parseTFEVersion(version string) (int, error) {
-	versionRegexp := regexp.MustCompile(`^v([0-9]{6})-([0-9]{1})$`)
-	matches := versionRegexp.FindStringSubmatch(version)
-	if len(matches) == 3 {
-		return strconv.Atoi(matches[1] + matches[2])
+// useRunsEndpoint determines whether to use the Runs endpoint(available since v202409-1) based on the TFE version.
+func useRunsEndpoint(version string) (bool, error) {
+	// For versions 1.0.0 and 1.0.1 version string will be empty.
+	if version == "" {
+		return true, nil
 	}
 
-	return 0, fmt.Errorf("malformed TFE version %s", version)
+	// Check for the Calendar Version format vYYYYMM-N (e.g., v202310-1).
+	re := regexp.MustCompile(`^v([0-9]{6})-([0-9]{1})$`)
+	matches := re.FindStringSubmatch(version)
+	if len(matches) == 3 {
+		calVer, err := strconv.Atoi(matches[1] + matches[2])
+		if err != nil {
+			return false, err
+		}
+		if calVer >= 2024091 {
+			return true, nil
+		}
+	}
+
+	return false, fmt.Errorf("malformed TFE version %s", version)
 }
