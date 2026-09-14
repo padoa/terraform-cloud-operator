@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -114,7 +114,7 @@ func (r *WorkspaceReconciler) getInstanceRunTasks(ctx context.Context, w *worksp
 	if hasRunTaskName(w) {
 		listOpts := &tfc.RunTaskListOptions{
 			ListOptions: tfc.ListOptions{
-				PageSize: maxPageSize,
+				PageSize: MaxPageSize,
 			},
 		}
 		for {
@@ -152,7 +152,7 @@ func (r *WorkspaceReconciler) getWorkspaceRunTasks(ctx context.Context, w *works
 
 	listOpts := &tfc.WorkspaceRunTaskListOptions{
 		ListOptions: tfc.ListOptions{
-			PageSize: maxPageSize,
+			PageSize: MaxPageSize,
 		},
 	}
 	for {

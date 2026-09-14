@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -79,7 +79,7 @@ func (r *WorkspaceReconciler) getWorkspaceTeamAccess(ctx context.Context, w *wor
 	listOpts := &tfc.TeamAccessListOptions{
 		WorkspaceID: w.instance.Status.WorkspaceID,
 		ListOptions: tfc.ListOptions{
-			PageSize: maxPageSize,
+			PageSize: MaxPageSize,
 		},
 	}
 	for {
@@ -111,7 +111,7 @@ func (r *WorkspaceReconciler) getTeams(ctx context.Context, w *workspaceInstance
 	listOpts := &tfc.TeamListOptions{
 		Names: fTeams,
 		ListOptions: tfc.ListOptions{
-			PageSize: maxPageSize,
+			PageSize: MaxPageSize,
 		},
 	}
 	for {

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -73,7 +73,7 @@ func updateWorkspaceVariable(ctx context.Context, w *workspaceInstance, specVari
 		if err := deleteWorkspaceVariable(ctx, w, workspaceVariable); err != nil {
 			return err
 		}
-		if err := createWorkspaceVariable(ctx, w, workspaceVariable); err != nil {
+		if err := createWorkspaceVariable(ctx, w, specVariable); err != nil {
 			return err
 		}
 		w.log.Info("Reconcile Variables", "msg", fmt.Sprintf("successfully updated %s variable %s", specVariable.Category, specVariable.Key))
@@ -142,7 +142,7 @@ func (r *WorkspaceReconciler) getWorkspaceVariables(ctx context.Context, w *work
 	w.log.Info("Reconcile Variables", "msg", "getting workspace variables")
 	listOpts := &tfc.VariableListOptions{
 		ListOptions: tfc.ListOptions{
-			PageSize: maxPageSize,
+			PageSize: MaxPageSize,
 		},
 	}
 	for {

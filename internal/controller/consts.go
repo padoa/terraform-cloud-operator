@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -9,9 +9,13 @@ import (
 
 // SHARED CONSTANTS
 const (
-	annotationTrue  = "true"
-	annotationFalse = "false"
-	maxPageSize     = 100
+	annotationPaused = "app.terraform.io/paused"
+	labelHasChanged  = "app.terraform.io/has-changed"
+	MetaTrue         = "true"
+	metaFalse        = "false"
+
+	InitPageNumber  = 1
+	MaxPageSize     = 100
 	requeueInterval = 15 * time.Second
 	runMessage      = "Triggered by HCP Terraform Operator"
 )
@@ -19,6 +23,11 @@ const (
 // AGENT POOL CONTROLLER'S CONSTANTS
 const (
 	agentPoolFinalizer = "agentpool.app.terraform.io/finalizer"
+)
+
+// AGENT TOKEN CONTROLLER'S CONSTANTS
+const (
+	agentTokenFinalizer = "agenttoken.app.terraform.io/finalizer"
 )
 
 // MODULE CONTROLLER'S CONSTANTS
@@ -65,17 +74,22 @@ const (
 	projectFinalizer = "project.app.terraform.io/finalizer"
 )
 
+// RUNS COLLECTOR CONTROLLER'S CONSTANTS
+const (
+	runsCollectorFinalizer = "runscollector.app.terraform.io/finalizer"
+)
+
 // WORKSPACE CONTROLLER'S CONSTANTS
 const (
 	workspaceFinalizerAlpha1 = "finalizer.workspace.app.terraform.io"
 	workspaceFinalizer       = "workspace.app.terraform.io/finalizer"
 
-	workspaceAnnotationRunNew              = "workspace.app.terraform.io/run-new"
-	workspaceAnnotationRunType             = "workspace.app.terraform.io/run-type"
-	workspaceAnnotationRunTerraformVersion = "workspace.app.terraform.io/run-terraform-version"
+	WorkspaceAnnotationRunNew              = "workspace.app.terraform.io/run-new"
+	WorkspaceAnnotationRunType             = "workspace.app.terraform.io/run-type"
+	WorkspaceAnnotationRunTerraformVersion = "workspace.app.terraform.io/run-terraform-version"
 
-	runTypePlan    = "plan"
-	runTypeApply   = "apply"
-	runTypeRefresh = "refresh"
-	runTypeDefault = runTypePlan
+	RunTypePlan    = "plan"
+	RunTypeApply   = "apply"
+	RunTypeRefresh = "refresh"
+	RunTypeDefault = RunTypePlan
 )

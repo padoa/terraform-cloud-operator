@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2022, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package controller
@@ -8,15 +8,16 @@ import (
 	"fmt"
 
 	tfc "github.com/hashicorp/go-tfe"
-	appv1alpha2 "github.com/hashicorp/hcp-terraform-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	appv1alpha2 "github.com/hashicorp/hcp-terraform-operator/api/v1alpha2"
 )
 
-func outputObjectName(name string) string {
+func OutputObjectName(name string) string {
 	return fmt.Sprintf("%s-outputs", name)
 }
 
@@ -35,11 +36,11 @@ func (r *WorkspaceReconciler) configMapAvailable(ctx context.Context, instance *
 	o := &corev1.ConfigMap{}
 	namespacedName := types.NamespacedName{
 		Namespace: instance.Namespace,
-		Name:      outputObjectName(instance.Name),
+		Name:      OutputObjectName(instance.Name),
 	}
 	err := r.Client.Get(ctx, namespacedName, o)
 	if err != nil {
-		return errors.IsNotFound(err)
+		return kerrors.IsNotFound(err)
 	}
 
 	return containsOwnerReference(o.GetOwnerReferences(), instance.UID)
@@ -50,11 +51,11 @@ func (r *WorkspaceReconciler) secretAvailable(ctx context.Context, instance *app
 	o := &corev1.Secret{}
 	namespacedName := types.NamespacedName{
 		Namespace: instance.Namespace,
-		Name:      outputObjectName(instance.Name),
+		Name:      OutputObjectName(instance.Name),
 	}
 	err := r.Client.Get(ctx, namespacedName, o)
 	if err != nil {
-		return errors.IsNotFound(err)
+		return kerrors.IsNotFound(err)
 	}
 
 	return containsOwnerReference(o.GetOwnerReferences(), instance.UID)
@@ -72,7 +73,7 @@ func (r *WorkspaceReconciler) setOutputs(ctx context.Context, w *workspaceInstan
 		return fmt.Errorf("current workspace state version is not available")
 	}
 
-	oName := outputObjectName(w.instance.Name)
+	oName := OutputObjectName(w.instance.Name)
 
 	if !r.configMapAvailable(ctx, &w.instance) {
 		return fmt.Errorf("configMap %s is in use by different object thus it cannot be used to store outputs", oName)
@@ -84,7 +85,7 @@ func (r *WorkspaceReconciler) setOutputs(ctx context.Context, w *workspaceInstan
 
 	opts := &tfc.StateVersionOutputsListOptions{
 		ListOptions: tfc.ListOptions{
-			PageSize: maxPageSize,
+			PageSize: MaxPageSize,
 		},
 	}
 	var outputs []*tfc.StateVersionOutput

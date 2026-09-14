@@ -1,4 +1,4 @@
-# Copyright (c) HashiCorp, Inc.
+# Copyright IBM Corp. 2022, 2025
 # SPDX-License-Identifier: MPL-2.0
 
 # This Dockerfile contains multiple targets.
@@ -7,7 +7,7 @@
 # Every target has a BIN_NAME argument that must be provided via --build-arg=BIN_NAME=<name>
 # when building.
 
-ARG GO_VERSION=1.24.2
+ARG GO_VERSION=1.26.5
 
 # ===================================
 #
@@ -90,7 +90,7 @@ ENTRYPOINT ["/bin/sh", "-c", "/$BIN_NAME"]
 
 # Red Hat UBI release image
 # -----------------------------------
-FROM registry.access.redhat.com/ubi9/ubi-micro:9.5 AS release-ubi
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7 AS release-ubi
 
 ARG BIN_NAME
 ARG PRODUCT_VERSION

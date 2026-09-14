@@ -25,7 +25,7 @@ Use the option `--version VERSION` with `helm install` and `helm upgrade` comman
 
     ```console
     $ helm install demo hashicorp/hcp-terraform-operator \
-      --version 2.9.0 \
+      --version 2.12.1 \
       --namespace tfc-operator-system \
       --create-namespace
     ```
@@ -36,14 +36,16 @@ Below are examples of the Operator installation/upgrade Helm chart with options.
 
 ```console
 $ helm install demo hashicorp/hcp-terraform-operator \
-  --version 2.9.0 \
+  --version 2.12.1 \
   --namespace tfc-operator-system \
   --create-namespace \
   --set operator.syncPeriod=10m \
   --set 'operator.watchedNamespaces={white,blue,red}' \
   --set controllers.agentPool.workers=5 \
+  --set controllers.agentToken.workers=5 \
   --set controllers.module.workers=5 \
   --set controllers.project.workers=5 \
+  --set controllers.runsCollector.workers=5 \
   --set controllers.workspace.workers=5
 ```
 
@@ -55,7 +57,7 @@ If targeting a Terraform Enterprise instance rather than HCP Terraform, set the 
 
 ```console
 $ helm install demo hashicorp/hcp-terraform-operator \
-  --version 2.9.0 \
+  --version 2.12.1 \
   --set operator.tfeAddress="https://tfe-api.my-company.com"
 ```
 
@@ -67,12 +69,14 @@ For more information, please refer to the [FAQ](./../../docs/faq.md#general-ques
 
 ```console
 $ helm upgrade demo hashicorp/hcp-terraform-operator \
-  --version 2.9.0 \
+  --version 2.12.1 \
   --namespace hcp-terraform-operator-system \
   --set operator.syncPeriod=5m \
   --set controllers.agentPool.workers=5 \
+  --set controllers.agentToken.workers=5 \
   --set controllers.module.workers=10 \
   --set controllers.project.workers=2 \
+  --set controllers.runsCollector.workers=7 \
   --set controllers.workspace.workers=20
 ```
 
@@ -186,23 +190,28 @@ For a more detailed explanation, please refer to the [FAQ](../../docs/faq.md#gen
 |-----|------|---------|-------------|
 | controllers.agentPool.syncPeriod | string | `"30s"` | The minimum frequency at which watched Agent Pool resources are reconciled. Format: 5s, 1m, etc. |
 | controllers.agentPool.workers | int | `1` | The number of the Agent Pool controller workers. |
+| controllers.agentToken.syncPeriod | string | `"15m"` | The minimum frequency at which watched Agent Token resources are reconciled. Format: 5s, 1m, etc. |
+| controllers.agentToken.workers | int | `1` | The number of the Agent Token controller workers. |
 | controllers.module.syncPeriod | string | `"5m"` | The minimum frequency at which watched Module resources are reconciled. Format: 5s, 1m, etc. |
 | controllers.module.workers | int | `1` | The number of the Module controller workers. |
 | controllers.project.syncPeriod | string | `"5m"` | The minimum frequency at which watched Project resources are reconciled. Format: 5s, 1m, etc. |
 | controllers.project.workers | int | `1` | The number of the Project controller workers. |
+| controllers.runsCollector.syncPeriod | string | `"15s"` | The minimum frequency at which watched Runs Collector resources are reconciled. Format: 5s, 1m, etc. |
+| controllers.runsCollector.workers | int | `1` | The number of the Runs Collector controller workers. |
 | controllers.workspace.syncPeriod | string | `"5m"` | The minimum frequency at which watched Workspace resources are reconciled. Format: 5s, 1m, etc. |
 | controllers.workspace.workers | int | `1` | The number of the Workspace controller workers. |
 | customCAcertificates | string | `""` | The base64 encoded custom Certificate Authority bundle used to validate API TLS certificates. |
 | imagePullSecrets | list | `[]` | Reference to one or more secrets essential for pulling container images. |
 | kubeRbacProxy.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | kubeRbacProxy.image.repository | string | `"quay.io/brancz/kube-rbac-proxy"` | Image repository. |
-| kubeRbacProxy.image.tag | string | `"v0.19.0"` | Image tag. |
+| kubeRbacProxy.image.tag | string | `"v0.20.1"` | Image tag. |
 | kubeRbacProxy.resources.limits.cpu | string | `"500m"` | Limits as a maximum amount of CPU to be used by a container. |
 | kubeRbacProxy.resources.limits.memory | string | `"128Mi"` | Limits as a maximum amount of memory to be used by a container. |
 | kubeRbacProxy.resources.requests.cpu | string | `"50m"` | Guaranteed minimum amount of CPU to be used by a container. |
 | kubeRbacProxy.resources.requests.memory | string | `"64Mi"` | Guaranteed minimum amount of memory to be used by a container. |
 | kubeRbacProxy.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"seccompProfile":{"type":"RuntimeDefault"}}` | Container security context. More information in [Kubernetes documentation](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/). |
 | operator.affinity | object | `{}` | Kubernetes Affinity. More information: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity |
+| operator.env | object | `{}` | Environment variables. |
 | operator.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | operator.image.repository | string | `"hashicorp/hcp-terraform-operator"` | Image repository. |
 | operator.image.tag | string | `""` | Image tag. Defaults to `.Chart.AppVersion`. |

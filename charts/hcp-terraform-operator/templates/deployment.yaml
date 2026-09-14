@@ -1,4 +1,4 @@
-# Copyright (c) HashiCorp, Inc.
+# Copyright IBM Corp. 2022, 2025
 # SPDX-License-Identifier: MPL-2.0
 
 apiVersion: apps/v1
@@ -39,16 +39,25 @@ spec:
           - --sync-period={{ .Values.operator.syncPeriod }}
           - --agent-pool-workers={{ .Values.controllers.agentPool.workers }}
           - --agent-pool-sync-period={{ .Values.controllers.agentPool.syncPeriod }}
+          - --agent-token-workers={{ .Values.controllers.agentToken.workers }}
+          - --agent-token-sync-period={{ .Values.controllers.agentToken.syncPeriod }}
           - --module-workers={{ .Values.controllers.module.workers }}
           - --module-sync-period={{ .Values.controllers.module.syncPeriod }}
           - --project-workers={{ .Values.controllers.project.workers }}
           - --project-sync-period={{ .Values.controllers.project.syncPeriod }}
+          - --runs-collector-workers={{ .Values.controllers.runsCollector.workers }}
+          - --runs-collector-sync-period={{ .Values.controllers.runsCollector.syncPeriod }}
           - --workspace-workers={{ .Values.controllers.workspace.workers }}
           - --workspace-sync-period={{ .Values.controllers.workspace.syncPeriod }}
           {{- range .Values.operator.watchedNamespaces }}
           - --namespace={{ . }}
           {{- end }}
           {{- $envVars := dict }}
+          {{- if .Values.operator.env }}
+            {{- range $key, $value := .Values.operator.env }}
+              {{- $_ := set $envVars $key $value }}
+            {{- end }}
+          {{- end }}
           {{- if .Values.operator.tfeAddress }}
             {{- $_ := set $envVars "TFE_ADDRESS" .Values.operator.tfeAddress }}
           {{- end }}
@@ -60,7 +69,7 @@ spec:
             {{- range $ek, $ev := $envVars }}
             - name: {{ $ek }}
               value: "{{ $ev -}}"
-            {{ end }}
+            {{- end }}
           {{- end }}
           command:
           - /manager
